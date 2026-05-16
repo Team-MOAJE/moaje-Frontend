@@ -5,7 +5,7 @@ import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 
 const RootNavigator = () => {
-  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
+  const isAuthenticated = useSelector(state => state.auth.isAuthenticated);
 
   return (
     <NavigationContainer>

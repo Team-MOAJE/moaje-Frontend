@@ -20,7 +20,7 @@ const MainNavigator = () => (
       headerTitleStyle: { fontWeight: 'bold' },
     }}
   >
-    <Stack.Screen name={ROUTES.HOME} component={HomeScreen} options={{ title: '홈' }} />
+    <Stack.Screen name={ROUTES.HOME} component={HomeScreen} options={{ headerShown: false }} />
     <Stack.Screen
       name={ROUTES.ACCOUNT_LIST}
       component={AccountListScreen}
@@ -31,21 +31,13 @@ const MainNavigator = () => (
       component={DailyLimitScreen}
       options={{ title: '일일 한도' }}
     />
-    <Stack.Screen
-      name={ROUTES.TRANSFER}
-      component={TransferScreen}
-      options={{ title: '이체' }}
-    />
+    <Stack.Screen name={ROUTES.TRANSFER} component={TransferScreen} options={{ title: '이체' }} />
     <Stack.Screen
       name={ROUTES.RECOMMENDATION}
       component={RecommendationScreen}
       options={{ title: '소득 추천' }}
     />
-    <Stack.Screen
-      name={ROUTES.MFA_SCREEN}
-      component={MFAScreen}
-      options={{ title: '추가 인증' }}
-    />
+    <Stack.Screen name={ROUTES.MFA_SCREEN} component={MFAScreen} options={{ title: '추가 인증' }} />
     <Stack.Screen
       name={ROUTES.SUPPORT_SCREEN}
       component={SupportScreen}
