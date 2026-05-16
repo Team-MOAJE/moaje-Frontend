@@ -63,7 +63,7 @@ const MENU_ITEMS = [
     title: '설정',
     desc: '알림, 보안, 앱 환경 설정',
     variant: 'active',
-    routeAction: null,
+    routeAction: ROUTES.SETTINGS,
   },
 ];
 

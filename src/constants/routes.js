@@ -12,4 +12,5 @@ export const ROUTES = {
   SUPPORT_SCREEN: 'SupportScreen',
   CATEGORY: 'Category',
   PROFILE: 'Profile',
+  SETTINGS: 'Settings',
 };

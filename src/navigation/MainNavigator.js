@@ -10,6 +10,7 @@ import MFAScreen from '../screens/auth/MFAScreen';
 import SupportScreen from '../screens/support/SupportScreen';
 import CategoryScreen from '../screens/category/CategoryScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -57,6 +58,11 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.PROFILE}
       component={ProfileScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.SETTINGS}
+      component={SettingsScreen}
       options={{ headerShown: false }}
     />
   </Stack.Navigator>
