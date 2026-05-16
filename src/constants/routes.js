@@ -10,4 +10,5 @@ export const ROUTES = {
   RECOMMENDATION: 'Recommendation',
   MFA_SCREEN: 'MFAScreen',
   SUPPORT_SCREEN: 'SupportScreen',
+  CATEGORY: 'Category',
 };

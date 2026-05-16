@@ -5,13 +5,19 @@ import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
 
 const NAV_ITEMS = [
-  { key: 'home', label: '홈', iconName: 'home', handler: 'onHomePress', active: true },
-  { key: 'transfer', label: '송금', iconName: 'send', handler: 'onTransferPress', active: false },
-  { key: 'chart', label: '분석', iconName: 'bar-chart-2', handler: 'onChartPress', active: false },
-  { key: 'grid', label: '카테고리', iconName: 'grid', handler: 'onGridPress', active: false },
+  { key: 'home', label: '홈', iconName: 'home', handler: 'onHomePress' },
+  { key: 'transfer', label: '송금', iconName: 'send', handler: 'onTransferPress' },
+  { key: 'chart', label: '분석', iconName: 'bar-chart-2', handler: 'onChartPress' },
+  { key: 'grid', label: '카테고리', iconName: 'grid', handler: 'onGridPress' },
 ];
 
-export default function BottomNavBar({ onHomePress, onTransferPress, onChartPress, onGridPress }) {
+export default function BottomNavBar({
+  onHomePress,
+  onTransferPress,
+  onChartPress,
+  onGridPress,
+  activeKey = 'home',
+}) {
   const handlers = { onHomePress, onTransferPress, onChartPress, onGridPress };
 
   return (
@@ -19,7 +25,7 @@ export default function BottomNavBar({ onHomePress, onTransferPress, onChartPres
       <View style={styles.bar}>
         {NAV_ITEMS.map(item => {
           const onPress = handlers[item.handler];
-          if (item.active) {
+          if (item.key === activeKey) {
             return (
               <Pressable
                 key={item.key}

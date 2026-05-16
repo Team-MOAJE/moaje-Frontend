@@ -8,6 +8,7 @@ import TransferScreen from '../screens/asset/TransferScreen';
 import RecommendationScreen from '../screens/work/RecommendationScreen';
 import MFAScreen from '../screens/auth/MFAScreen';
 import SupportScreen from '../screens/support/SupportScreen';
+import CategoryScreen from '../screens/category/CategoryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +43,11 @@ const MainNavigator = () => (
       name={ROUTES.SUPPORT_SCREEN}
       component={SupportScreen}
       options={{ title: '고객센터' }}
+    />
+    <Stack.Screen
+      name={ROUTES.CATEGORY}
+      component={CategoryScreen}
+      options={{ headerShown: false }}
     />
   </Stack.Navigator>
 );

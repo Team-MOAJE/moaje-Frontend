@@ -9,8 +9,9 @@ import QuickActions from '../../components/home/QuickActions';
 import CashFlowSummaryCard from '../../components/home/CashFlowSummaryCard';
 import BottomNavBar from '../../components/home/BottomNavBar';
 import { colors } from '../../theme';
+import { ROUTES } from '../../constants/routes';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const handleBellPress = () => {};
   const handleTransferPress = () => {};
   const handleConnectAccountPress = () => {};
@@ -19,7 +20,9 @@ export default function HomeScreen() {
   const handleBottomHomePress = () => {};
   const handleBottomTransferPress = () => {};
   const handleBottomChartPress = () => {};
-  const handleBottomGridPress = () => {};
+  const handleBottomGridPress = () => {
+    navigation.navigate(ROUTES.CATEGORY);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -47,6 +50,7 @@ export default function HomeScreen() {
           onTransferPress={handleBottomTransferPress}
           onChartPress={handleBottomChartPress}
           onGridPress={handleBottomGridPress}
+          activeKey="home"
         />
       </View>
     </SafeAreaView>
