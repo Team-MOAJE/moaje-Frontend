@@ -32,7 +32,11 @@ const MainNavigator = () => (
       component={DailyLimitScreen}
       options={{ title: '일일 한도' }}
     />
-    <Stack.Screen name={ROUTES.TRANSFER} component={TransferScreen} options={{ title: '이체' }} />
+    <Stack.Screen
+      name={ROUTES.TRANSFER}
+      component={TransferScreen}
+      options={{ headerShown: false }}
+    />
     <Stack.Screen
       name={ROUTES.RECOMMENDATION}
       component={RecommendationScreen}
