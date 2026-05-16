@@ -6,7 +6,7 @@ export const formatKRW = (amount, showSign = false) => {
   return `${formatted}원`;
 };
 
-export const formatKRWShort = (amount) => {
+export const formatKRWShort = amount => {
   if (amount === null || amount === undefined) return '-';
   const abs = Math.abs(amount);
   const sign = amount < 0 ? '-' : '';

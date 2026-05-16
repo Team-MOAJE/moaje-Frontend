@@ -9,9 +9,9 @@ const workSlice = createSlice({
     error: null,
   },
   reducers: {},
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
-      .addCase(fetchRecommendations.pending, (state) => {
+      .addCase(fetchRecommendations.pending, state => {
         state.isLoading = true;
         state.error = null;
       })

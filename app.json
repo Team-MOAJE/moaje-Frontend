@@ -12,9 +12,6 @@
     "android": {
       "package": "com.moaje.fintechapp"
     },
-    "plugins": [
-      "expo-secure-store",
-      "expo-router"
-    ]
+    "plugins": ["expo-secure-store", "expo-router"]
   }
 }

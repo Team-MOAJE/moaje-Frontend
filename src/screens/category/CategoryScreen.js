@@ -14,7 +14,7 @@ const MENU_ITEMS = [
     title: '프로필',
     desc: '내 정보와 로그인 상태 관리',
     variant: 'active',
-    routeAction: null,
+    routeAction: ROUTES.PROFILE,
   },
   {
     iconName: 'send',

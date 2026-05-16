@@ -1,8 +1,8 @@
-import * as SecureStore from "expo-secure-store";
-import axios from "axios";
+import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
 
-const SECURE_KEY_ACCESS_TOKEN = "ACCESS_TOKEN";
-const SECURE_KEY_REFRESH_TOKEN = "REFRESH_TOKEN";
+const SECURE_KEY_ACCESS_TOKEN = 'ACCESS_TOKEN';
+const SECURE_KEY_REFRESH_TOKEN = 'REFRESH_TOKEN';
 
 let _accessTokenMemory = null;
 
@@ -52,7 +52,7 @@ export const refreshAccessToken = async () => {
   const refreshToken = await getRefreshToken();
 
   if (!refreshToken) {
-    throw new Error("No refresh token available");
+    throw new Error('No refresh token available');
   }
 
   const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -64,11 +64,10 @@ export const refreshAccessToken = async () => {
   const envelope = response.data;
 
   if (!envelope.success) {
-    throw new Error(envelope.message || "Token refresh failed");
+    throw new Error(envelope.message || 'Token refresh failed');
   }
 
-  const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
-    envelope.data;
+  const { accessToken: newAccessToken, refreshToken: newRefreshToken } = envelope.data;
 
   await setTokens(newAccessToken, newRefreshToken ?? refreshToken);
 

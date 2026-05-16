@@ -17,9 +17,9 @@ const assetSlice = createSlice({
       state.totalBalance = action.payload;
     },
   },
-  extraReducers: (builder) => {
+  extraReducers: builder => {
     builder
-      .addCase(fetchAccounts.pending, (state) => {
+      .addCase(fetchAccounts.pending, state => {
         state.isLoading = true;
         state.error = null;
       })
@@ -31,11 +31,11 @@ const assetSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload ?? '계좌 조회에 실패했습니다.';
       })
-      .addCase(transferFunds.pending, (state) => {
+      .addCase(transferFunds.pending, state => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(transferFunds.fulfilled, (state) => {
+      .addCase(transferFunds.fulfilled, state => {
         state.isLoading = false;
       })
       .addCase(transferFunds.rejected, (state, action) => {

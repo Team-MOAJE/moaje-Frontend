@@ -51,7 +51,7 @@ export const handleRequiredAction = (requiredAction, navigation, message) => {
             text: '고객센터',
             onPress: () => navigation?.navigate(ROUTES.SUPPORT_SCREEN),
           },
-        ],
+        ]
       );
       break;
 

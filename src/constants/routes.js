@@ -11,4 +11,5 @@ export const ROUTES = {
   MFA_SCREEN: 'MFAScreen',
   SUPPORT_SCREEN: 'SupportScreen',
   CATEGORY: 'Category',
+  PROFILE: 'Profile',
 };
