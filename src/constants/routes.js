@@ -13,4 +13,5 @@ export const ROUTES = {
   CATEGORY: 'Category',
   PROFILE: 'Profile',
   SETTINGS: 'Settings',
+  TRANSACTION_HISTORY: 'TransactionHistory',
 };

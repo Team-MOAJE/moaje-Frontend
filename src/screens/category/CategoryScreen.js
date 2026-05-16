@@ -28,7 +28,7 @@ const MENU_ITEMS = [
     title: '거래내역',
     desc: '수입과 지출 흐름 확인',
     variant: 'active',
-    routeAction: null,
+    routeAction: ROUTES.TRANSACTION_HISTORY,
   },
   {
     iconName: 'pie-chart',

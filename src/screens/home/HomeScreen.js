@@ -15,7 +15,7 @@ export default function HomeScreen({ navigation }) {
   const handleBellPress = () => {};
   const handleTransferPress = () => {};
   const handleConnectAccountPress = () => {};
-  const handleTransactionHistoryPress = () => {};
+  const handleTransactionHistoryPress = () => navigation.navigate(ROUTES.TRANSACTION_HISTORY);
   const handleAnalysisPress = () => {};
   const handleBottomHomePress = () => {};
   const handleBottomTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
