@@ -16,10 +16,10 @@ export default function HomeScreen({ navigation }) {
   const handleTransferPress = () => {};
   const handleConnectAccountPress = () => {};
   const handleTransactionHistoryPress = () => navigation.navigate(ROUTES.TRANSACTION_HISTORY);
-  const handleAnalysisPress = () => {};
+  const handleAnalysisPress = () => navigation.navigate(ROUTES.DAILY_LIMIT);
   const handleBottomHomePress = () => {};
   const handleBottomTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
-  const handleBottomChartPress = () => {};
+  const handleBottomChartPress = () => navigation.navigate(ROUTES.DAILY_LIMIT);
   const handleBottomGridPress = () => {
     navigation.navigate(ROUTES.CATEGORY);
   };
@@ -33,7 +33,7 @@ export default function HomeScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           <AppHeader onBellPress={handleBellPress} />
-          <DailyLimitCard />
+          <DailyLimitCard onPress={() => navigation.navigate(ROUTES.DAILY_LIMIT)} />
           <AccountLedgerCard />
           <QuickActions
             onTransfer={handleTransferPress}

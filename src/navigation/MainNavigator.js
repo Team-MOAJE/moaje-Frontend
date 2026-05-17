@@ -4,6 +4,7 @@ import { ROUTES } from '../constants/routes';
 import HomeScreen from '../screens/home/HomeScreen';
 import AccountListScreen from '../screens/asset/AccountListScreen';
 import DailyLimitScreen from '../screens/asset/DailyLimitScreen';
+import AnalysisScreen from '../screens/asset/AnalysisScreen';
 import TransferScreen from '../screens/asset/TransferScreen';
 import RecommendationScreen from '../screens/work/RecommendationScreen';
 import MFAScreen from '../screens/auth/MFAScreen';
@@ -34,7 +35,12 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.DAILY_LIMIT}
       component={DailyLimitScreen}
-      options={{ title: '일일 한도' }}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.ANALYSIS}
+      component={AnalysisScreen}
+      options={{ headerShown: false }}
     />
     <Stack.Screen
       name={ROUTES.TRANSFER}

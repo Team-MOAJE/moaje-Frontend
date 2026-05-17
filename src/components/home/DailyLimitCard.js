@@ -10,9 +10,9 @@ const INFO_ITEMS = [
   { label: '이벤트 예비비', value: '36,500원' },
 ];
 
-export default function DailyLimitCard() {
+export default function DailyLimitCard({ onPress }) {
   return (
-    <TouchableOpacity activeOpacity={0.97} style={styles.wrapper}>
+    <TouchableOpacity activeOpacity={0.97} style={styles.wrapper} onPress={onPress}>
       <LinearGradient
         colors={[colors.oliveDark, colors.olive, colors.oliveMid]}
         start={{ x: 0, y: 0 }}

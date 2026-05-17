@@ -56,7 +56,7 @@ export default function TransferScreen({ navigation }) {
 
   const handleBottomHomePress = () => navigation.navigate(ROUTES.HOME);
   const handleBottomTransferPress = () => {};
-  const handleBottomChartPress = () => {};
+  const handleBottomChartPress = () => navigation.navigate(ROUTES.DAILY_LIMIT);
   const handleBottomCategoryPress = () => navigation.navigate(ROUTES.CATEGORY);
 
   return (

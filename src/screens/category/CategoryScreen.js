@@ -137,7 +137,7 @@ export default function CategoryScreen({ navigation }) {
         <BottomNavBar
           onHomePress={() => navigation.navigate(ROUTES.HOME)}
           onTransferPress={() => navigation.navigate(ROUTES.TRANSFER)}
-          onChartPress={() => {}}
+          onChartPress={() => navigation.navigate(ROUTES.DAILY_LIMIT)}
           onGridPress={() => {}}
           activeKey="grid"
         />
