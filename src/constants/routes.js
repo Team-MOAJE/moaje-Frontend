@@ -14,4 +14,5 @@ export const ROUTES = {
   PROFILE: 'Profile',
   SETTINGS: 'Settings',
   TRANSACTION_HISTORY: 'TransactionHistory',
+  TRANSACTION_DETAIL: 'TransactionDetail',
 };

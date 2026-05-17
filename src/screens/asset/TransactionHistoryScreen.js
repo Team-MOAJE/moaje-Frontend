@@ -364,9 +364,11 @@ const badgeStyles = StyleSheet.create({
 function TransactionListItem({ tx, onPress }) {
   const iconCfg = ICON_MAP[tx.status] ?? ICON_MAP.pending;
   const positive = tx.amount > 0;
+  const Container = onPress ? TouchableOpacity : View;
+  const containerProps = onPress ? { onPress, activeOpacity: 0.75 } : {};
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.75} style={listStyles.container}>
+    <Container {...containerProps} style={listStyles.container}>
       <View style={[listStyles.iconBox, { backgroundColor: iconCfg.bg }]}>
         <Feather name={iconCfg.name} size={20} color={iconCfg.fg} />
       </View>
@@ -387,7 +389,7 @@ function TransactionListItem({ tx, onPress }) {
         </Text>
         <TransactionStatusBadge status={tx.status} />
       </View>
-    </TouchableOpacity>
+    </Container>
   );
 }
 
@@ -652,6 +654,18 @@ export default function TransactionHistoryScreen({ navigation }) {
 
   const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
 
+  const handleTxPress = tx => {
+    navigation.navigate(ROUTES.TRANSACTION_DETAIL, {
+      transactionId: tx.id,
+      status: tx.status,
+      counterparty: tx.counterparty,
+      amount: tx.amount,
+      time: tx.time,
+      description: tx.description,
+      group: tx.group,
+    });
+  };
+
   const filtered = ALL_TX.filter(t => matchesFilter(t, filter));
   const groups = [...new Set(filtered.map(t => t.group))];
 
@@ -733,7 +747,10 @@ export default function TransactionHistoryScreen({ navigation }) {
                       .filter(t => t.group === g)
                       .map((t, i, arr) => (
                         <View key={t.id}>
-                          <TransactionListItem tx={t} onPress={() => {}} />
+                          <TransactionListItem
+                            tx={t}
+                            onPress={t.status === 'checking' ? null : () => handleTxPress(t)}
+                          />
                           {i < arr.length - 1 && <View style={styles.divider} />}
                         </View>
                       ))}

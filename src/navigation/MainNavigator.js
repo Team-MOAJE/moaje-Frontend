@@ -12,6 +12,7 @@ import CategoryScreen from '../screens/category/CategoryScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import TransactionHistoryScreen from '../screens/asset/TransactionHistoryScreen';
+import TransactionDetailScreen from '../screens/asset/TransactionDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -69,6 +70,11 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.TRANSACTION_HISTORY}
       component={TransactionHistoryScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.TRANSACTION_DETAIL}
+      component={TransactionDetailScreen}
       options={{ headerShown: false }}
     />
   </Stack.Navigator>
