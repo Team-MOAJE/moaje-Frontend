@@ -16,4 +16,14 @@ export const ROUTES = {
   TRANSACTION_HISTORY: 'TransactionHistory',
   TRANSACTION_DETAIL: 'TransactionDetail',
   ANALYSIS: 'Analysis',
+
+  // 공통 상태 화면
+  STATUS_SPLASH_LOADING: 'StatusSplashLoading',
+  STATUS_DATA_LOADING: 'StatusDataLoading',
+  STATUS_SKELETON_LOADING: 'StatusSkeletonLoading',
+  STATUS_ERROR: 'StatusError',
+
+  // 개발용 미리보기 (__DEV__ 환경에서만 사용)
+  DEV_STATE_PREVIEW: 'DevStatePreview',
+  DEV_COMPONENT_STATES: 'DevComponentStates',
 };
