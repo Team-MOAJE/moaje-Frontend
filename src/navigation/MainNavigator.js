@@ -14,6 +14,7 @@ import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import TransactionHistoryScreen from '../screens/asset/TransactionHistoryScreen';
 import TransactionDetailScreen from '../screens/asset/TransactionDetailScreen';
+import PinInputScreen from '../screens/auth/PinInputScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -81,6 +82,11 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.TRANSACTION_DETAIL}
       component={TransactionDetailScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.PIN_INPUT}
+      component={PinInputScreen}
       options={{ headerShown: false }}
     />
   </Stack.Navigator>

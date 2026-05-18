@@ -16,6 +16,7 @@ export const ROUTES = {
   TRANSACTION_HISTORY: 'TransactionHistory',
   TRANSACTION_DETAIL: 'TransactionDetail',
   ANALYSIS: 'Analysis',
+  PIN_INPUT: 'PinInput',
 
   // 공통 상태 화면
   STATUS_SPLASH_LOADING: 'StatusSplashLoading',
