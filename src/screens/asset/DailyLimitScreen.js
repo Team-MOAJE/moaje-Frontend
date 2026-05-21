@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, Animated, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useSelector, useDispatch } from 'react-redux';
 import { colors, radius, shadows } from '../../theme';
 import { ROUTES } from '../../constants/routes';
+import { fetchDailyLimit } from '../../features/work/workApi';
 import DailyLimitHeroCard from '../../components/dailylimit/DailyLimitHeroCard';
 import DailyLimitStatusCard from '../../components/dailylimit/DailyLimitStatusCard';
 import DailyLimitFormulaCard from '../../components/dailylimit/DailyLimitFormulaCard';
@@ -14,7 +16,6 @@ import BottomNavBar from '../../components/home/BottomNavBar';
 const formatCurrency = amount => `${Number(amount).toLocaleString()}원`;
 
 // ── 서버 상태값 → UI 상태 매핑 ────────────────────────────────
-// TODO: API 연결 시 실제 서버 상태값 케이스 추가
 const mapDailyLimitStatus = serverStatus => {
   switch (serverStatus) {
     case 'SAFE':
@@ -30,49 +31,6 @@ const mapDailyLimitStatus = serverStatus => {
       // UNKNOWN, RECONCILIATION_REQUIRED 등 내부 상태값은 사용자에게 직접 표시 안 함
       return 'safe';
   }
-};
-
-// ── Mock 데이터 ────────────────────────────────────────────────
-// TODO: API 연결 시 이 블록을 API 응답으로 교체
-const MOCK_DAILY_LIMIT = {
-  amount: 18500,
-  spent: 6200,
-  daysLeft: 7,
-  status: 'safe',
-  formulaItems: [
-    { label: '현재 잔액', value: 246000, op: null, highlight: false },
-    { label: '예정 알바비', value: 320000, op: 'plus', highlight: false },
-    { label: '남은 고정지출', value: 150000, op: 'minus', highlight: false },
-    { label: '이벤트 예비비', value: 36500, op: 'minus', highlight: false },
-    { label: '급여일까지 남은 일수', value: 7, op: 'divide', highlight: false, unit: '일' },
-    { label: '오늘 가용금액', value: 18500, op: 'equal', highlight: true },
-  ],
-  recommendItems: [
-    {
-      iconName: 'food-fork-drink',
-      iconLib: 'MCI',
-      title: '오늘 점심 예산 조절하기',
-      desc: '남은 권장 금액 기준 8,000원 이하를 추천해요.',
-      cta: '확인하기',
-      action: 'lunch',
-    },
-    {
-      iconName: 'send',
-      iconLib: 'Feather',
-      title: '송금 전 가용금액 확인하기',
-      desc: '송금 후 남을 생활비를 먼저 확인해보세요.',
-      cta: '송금하기',
-      action: 'transfer',
-    },
-    {
-      iconName: 'piggy-bank',
-      iconLib: 'MCI',
-      title: '시험기간 예비비 유지하기',
-      desc: '다음 주 지출 증가에 대비해 예비비를 남겨두세요.',
-      cta: '예비비 보기',
-      action: 'reserve',
-    },
-  ],
 };
 
 // ── Toast 설정 ─────────────────────────────────────────────────
@@ -173,8 +131,16 @@ const skStyles = StyleSheet.create({
 
 // ── 메인 화면 ──────────────────────────────────────────────────
 export default function DailyLimitScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const dailyLimit = useSelector(state => state.work.dailyLimit);
+  const isLoading = useSelector(state => state.work.dailyLimitLoading);
+
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '', variant: 'info' });
+
+  useEffect(() => {
+    dispatch(fetchDailyLimit());
+  }, [dispatch]);
 
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(8)).current;
@@ -210,11 +176,12 @@ export default function DailyLimitScreen({ navigation }) {
     setRefreshing(true);
     showToast('가용금액을 다시 계산하고 있어요.', 'info');
     try {
-      // TODO: API 연결 시 여기서 실제 API 호출
-      // const data = await dailyLimitApi.fetch();
-      // setDailyLimitData(data);
-      await new Promise(resolve => setTimeout(resolve, 1100));
-      showToast('가용금액이 업데이트됐어요.', 'success');
+      const result = await dispatch(fetchDailyLimit());
+      if (fetchDailyLimit.fulfilled.match(result)) {
+        showToast('가용금액이 업데이트됐어요.', 'success');
+      } else {
+        showToast('가용금액을 불러오지 못했어요. 잠시 후 다시 시도해주세요.', 'danger');
+      }
     } catch {
       showToast('가용금액을 불러오지 못했어요. 잠시 후 다시 시도해주세요.', 'danger');
     } finally {
@@ -230,13 +197,21 @@ export default function DailyLimitScreen({ navigation }) {
     }
   };
 
-  // formulaItems를 표시용으로 변환 (number → 포맷 문자열)
-  const formattedFormulaItems = MOCK_DAILY_LIMIT.formulaItems.map(item => ({
+  const safeData = dailyLimit ?? {
+    amount: 0,
+    spent: 0,
+    daysLeft: 0,
+    status: 'safe',
+    formulaItems: [],
+    recommendItems: [],
+  };
+
+  const formattedFormulaItems = safeData.formulaItems.map(item => ({
     ...item,
     displayValue: item.unit ? `${item.value}${item.unit}` : formatCurrency(item.value),
   }));
 
-  const uiStatus = mapDailyLimitStatus(MOCK_DAILY_LIMIT.status);
+  const uiStatus = mapDailyLimitStatus(safeData.status);
   const toastCfg = TOAST_CONFIG[toast.variant] ?? TOAST_CONFIG.info;
 
   return (
@@ -265,28 +240,25 @@ export default function DailyLimitScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {refreshing ? (
+          {isLoading || (!dailyLimit && !refreshing) ? (
             <HeroSkeleton />
           ) : (
             <DailyLimitHeroCard
-              amount={MOCK_DAILY_LIMIT.amount}
-              spent={MOCK_DAILY_LIMIT.spent}
-              daysLeft={MOCK_DAILY_LIMIT.daysLeft}
+              amount={safeData.amount}
+              spent={safeData.spent}
+              daysLeft={safeData.daysLeft}
             />
           )}
 
           <DailyLimitStatusCard
             status={uiStatus}
-            recommended={MOCK_DAILY_LIMIT.amount}
-            spent={MOCK_DAILY_LIMIT.spent}
+            recommended={safeData.amount}
+            spent={safeData.spent}
           />
 
           <DailyLimitFormulaCard items={formattedFormulaItems} />
 
-          <RecommendationActionCard
-            items={MOCK_DAILY_LIMIT.recommendItems}
-            onAction={handleAction}
-          />
+          <RecommendationActionCard items={safeData.recommendItems} onAction={handleAction} />
 
           <View style={styles.bottomPad} />
         </ScrollView>

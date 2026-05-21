@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector, useDispatch } from 'react-redux';
 
 import AppHeader from '../../components/home/AppHeader';
 import DailyLimitCard from '../../components/home/DailyLimitCard';
@@ -10,8 +11,22 @@ import CashFlowSummaryCard from '../../components/home/CashFlowSummaryCard';
 import BottomNavBar from '../../components/home/BottomNavBar';
 import { colors } from '../../theme';
 import { ROUTES } from '../../constants/routes';
+import { fetchAccounts } from '../../features/asset/assetApi';
+import { fetchDailyLimit } from '../../features/work/workApi';
+import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
 
 export default function HomeScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const user = useSelector(state => state.auth.user);
+  const accounts = useSelector(state => state.asset.accounts);
+  const dailyLimit = useSelector(state => state.work.dailyLimit);
+  const defaultAccount = selectDefaultAccount(accounts);
+
+  useEffect(() => {
+    dispatch(fetchAccounts());
+    dispatch(fetchDailyLimit());
+  }, [dispatch]);
+
   const handleBellPress = () => {};
   const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
   const handleConnectAccountPress = () => {};
@@ -32,9 +47,18 @@ export default function HomeScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <AppHeader onBellPress={handleBellPress} />
-          <DailyLimitCard onPress={() => navigation.navigate(ROUTES.DAILY_LIMIT)} />
-          <AccountLedgerCard />
+          <AppHeader onBellPress={handleBellPress} userName={user?.name} />
+          <DailyLimitCard
+            onPress={() => navigation.navigate(ROUTES.DAILY_LIMIT)}
+            amount={dailyLimit?.amount}
+            daysLeft={dailyLimit?.daysLeft}
+            formulaItems={dailyLimit?.formulaItems}
+          />
+          <AccountLedgerCard
+            bankName={defaultAccount?.bankName}
+            tokenId={defaultAccount?.tokenId}
+            balance={defaultAccount?.balance}
+          />
           <QuickActions
             onTransfer={handleTransferPress}
             onConnect={handleConnectAccountPress}

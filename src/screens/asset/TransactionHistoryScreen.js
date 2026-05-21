@@ -12,68 +12,30 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSelector, useDispatch } from 'react-redux';
 import { colors, radius, shadows, spacing } from '../../theme';
 import { ROUTES } from '../../constants/routes';
-
-// ── 정적 목 데이터 ────────────────────────────────────────────
-const ALL_TX = [
-  {
-    id: 'tx1',
-    status: 'checking',
-    counterparty: '김민수',
-    amount: -10000,
-    time: '오늘 14:32',
-    description: '금융망 응답을 확인하고 있어요.',
-    group: '오늘',
-  },
-  {
-    id: 'tx2',
-    status: 'completed',
-    counterparty: '이서연',
-    amount: -25000,
-    time: '오늘 12:10',
-    description: '송금이 완료됐어요.',
-    group: '오늘',
-  },
-  {
-    id: 'tx3',
-    status: 'depositCompleted',
-    counterparty: '알바비',
-    amount: 120000,
-    time: '어제 18:00',
-    description: '예정된 알바비가 입금됐어요.',
-    group: '어제',
-  },
-  {
-    id: 'tx4',
-    status: 'failed',
-    counterparty: '박지훈',
-    amount: -15000,
-    time: '어제 16:45',
-    description: '송금이 완료되지 않았고 금액은 다시 사용할 수 있어요.',
-    group: '어제',
-  },
-  {
-    id: 'tx5',
-    status: 'reversed',
-    counterparty: '최유나',
-    amount: -10000,
-    time: '이번 주 월요일 09:20',
-    description: '확인되지 않은 거래가 취소 처리됐어요.',
-    group: '이번 주',
-  },
-  {
-    id: 'tx6',
-    status: 'expenseCompleted',
-    counterparty: '캠퍼스 카페',
-    amount: -8500,
-    time: '이번 주 월요일 08:40',
-    description: '식비 카테고리로 분류됐어요.',
-    group: '이번 주',
-  },
-];
+import {
+  fetchAccounts,
+  fetchTransactions,
+  fetchAccountSummary,
+} from '../../features/asset/assetApi';
+import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
+import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
+import { formatDateTime } from '../../utils/formatDate';
 
 const FILTERS = ['전체', '입금', '출금', '송금', '확인 중', '실패/취소'];
+
+const getGroup = isoString => {
+  if (!isoString) return '이전';
+  const d = new Date(isoString);
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / 86400000);
+  if (diffDays === 0) return '오늘';
+  if (diffDays === 1) return '어제';
+  if (diffDays < 7) return '이번 주';
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 const matchesFilter = (tx, f) => {
   switch (f) {
@@ -634,9 +596,21 @@ const emptyStyles = StyleSheet.create({
 // ── 메인 화면 ─────────────────────────────────────────────────
 
 export default function TransactionHistoryScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const transactions = useSelector(state => state.asset.transactions);
+  const summary = useSelector(state => state.asset.summary);
+  const transactionsLoading = useSelector(state => state.asset.transactionsLoading);
+  const transactionsRefreshing = useSelector(state => state.asset.transactionsRefreshing);
+  const accounts = useSelector(state => state.asset.accounts);
+  const defaultAccount = selectDefaultAccount(accounts);
+
   const [filter, setFilter] = useState('전체');
-  const [loading, setLoading] = useState(false);
-  const [cached] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchAccounts());
+    dispatch(fetchTransactions());
+    dispatch(fetchAccountSummary());
+  }, [dispatch]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -646,10 +620,11 @@ export default function TransactionHistoryScreen({ navigation }) {
     }
   };
 
-  const handleRefresh = () => {
-    if (loading) return;
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1100);
+  const handleRefresh = async () => {
+    if (transactionsRefreshing || transactionsLoading) return;
+    await dispatch(fetchAccounts());
+    await dispatch(fetchTransactions());
+    await dispatch(fetchAccountSummary());
   };
 
   const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
@@ -658,15 +633,17 @@ export default function TransactionHistoryScreen({ navigation }) {
     navigation.navigate(ROUTES.TRANSACTION_DETAIL, {
       transactionId: tx.id,
       status: tx.status,
-      counterparty: tx.counterparty,
-      amount: tx.amount,
-      time: tx.time,
-      description: tx.description,
-      group: tx.group,
     });
   };
 
-  const filtered = ALL_TX.filter(t => matchesFilter(t, filter));
+  const mappedTxList = transactions.map(tx => ({
+    ...tx,
+    status: mapTransactionStatus(tx.status),
+    time: tx.requestedAt ? formatDateTime(tx.requestedAt) : '-',
+    group: getGroup(tx.requestedAt),
+  }));
+
+  const filtered = mappedTxList.filter(t => matchesFilter(t, filter));
   const groups = [...new Set(filtered.map(t => t.group))];
 
   return (
@@ -700,15 +677,12 @@ export default function TransactionHistoryScreen({ navigation }) {
         >
           {/* 잔액 요약 카드 */}
           <TransactionSummaryCard
-            bank="카카오뱅크 생활비 통장"
-            token="acct_****_7F2A"
-            current={246000}
-            available={236000}
-            held={10000}
+            bank={defaultAccount?.bankName ?? '-'}
+            token={defaultAccount?.tokenId ?? '-'}
+            current={summary?.currentBalance ?? 0}
+            available={summary?.availableBalance ?? 0}
+            held={summary?.heldAmount ?? 0}
           />
-
-          {/* 캐시 배너 (mock 상태 — 기본 비활성) */}
-          {cached && <CachedDataBanner />}
 
           {/* 필터 칩 가로 스크롤 */}
           <ScrollView
@@ -727,7 +701,7 @@ export default function TransactionHistoryScreen({ navigation }) {
           </ScrollView>
 
           {/* 로딩 / 빈 상태 / 거래 목록 */}
-          {loading ? (
+          {transactionsLoading ? (
             <TransactionLoadingSkeleton />
           ) : filtered.length === 0 ? (
             filter !== '전체' ? (
@@ -749,7 +723,11 @@ export default function TransactionHistoryScreen({ navigation }) {
                         <View key={t.id}>
                           <TransactionListItem
                             tx={t}
-                            onPress={t.status === 'checking' ? null : () => handleTxPress(t)}
+                            onPress={
+                              t.status === 'checking' || t.status === 'pending'
+                                ? null
+                                : () => handleTxPress(t)
+                            }
                           />
                           {i < arr.length - 1 && <View style={styles.divider} />}
                         </View>

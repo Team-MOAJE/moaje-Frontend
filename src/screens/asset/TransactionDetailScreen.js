@@ -1,10 +1,21 @@
-import React from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSelector, useDispatch } from 'react-redux';
 import { colors, radius, shadows, spacing } from '../../theme';
 import { ROUTES } from '../../constants/routes';
+import { fetchTransactionDetail } from '../../features/asset/assetApi';
+import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
 
 // ── 로컬 색상 (theme에 없는 값) ───────────────────────────────
 const LC = {
@@ -17,62 +28,6 @@ const LC = {
   oliveGradEnd: '#7E9148',
   failedIcon: '#E5484D',
   reversedIcon: '#6F7F3F',
-};
-
-// ── 거래별 fallback 데이터 ─────────────────────────────────────
-// requestedAt: 상세 화면용 전체 날짜 표기
-// time: 거래내역 목록용 짧은 표기 (상세 화면에서 사용하지 않음)
-const DETAIL_FALLBACKS = {
-  completed: {
-    transactionId: 'tx2',
-    status: 'completed',
-    counterparty: '이서연',
-    amount: -25000,
-    requestedAt: '2026.05.07 12:10',
-    description: '송금이 완료됐어요.',
-    group: '오늘',
-    memo: '스터디 회비',
-  },
-  depositCompleted: {
-    transactionId: 'tx3',
-    status: 'depositCompleted',
-    counterparty: '알바비',
-    amount: 120000,
-    requestedAt: '2026.05.06 18:00',
-    description: '예정된 알바비가 입금됐어요.',
-    group: '어제',
-    memo: '5월 1주차 알바',
-  },
-  expenseCompleted: {
-    transactionId: 'tx6',
-    status: 'expenseCompleted',
-    counterparty: '캠퍼스 카페',
-    amount: -8500,
-    requestedAt: '2026.05.05 08:40',
-    description: '지출이 정상적으로 처리됐어요.',
-    group: '이번 주',
-    memo: '아메리카노',
-  },
-  failed: {
-    transactionId: 'tx4',
-    status: 'failed',
-    counterparty: '박지훈',
-    amount: -15000,
-    requestedAt: '2026.05.06 16:45',
-    description: '송금이 완료되지 않았고 금액은 다시 사용할 수 있어요.',
-    group: '어제',
-    memo: '교재비',
-  },
-  reversed: {
-    transactionId: 'tx5',
-    status: 'reversed',
-    counterparty: '최유나',
-    amount: -10000,
-    requestedAt: '2026.05.05 09:20',
-    description: '확인되지 않은 거래가 취소 처리됐어요.',
-    group: '이번 주',
-    memo: 'MT 회비',
-  },
 };
 
 // ── 상태별 UI 설정 (거래별 값 제외) ──────────────────────────────
@@ -126,6 +81,26 @@ const STATUS_UI_CONFIG = {
     timelineSteps: ['송금 요청 접수', '금융망 응답 없음', '확인 중', '망취소 성공', '취소 완료'],
     noticeText: '확인되지 않은 거래가 취소 처리됐어요.',
     statusIcon: 'rotate-ccw',
+  },
+  pending: {
+    heroStyle: 'reversed',
+    heroLabel: '처리 중',
+    heroMessage: '송금 요청이 접수됐어요. 잠시 기다려주세요.',
+    typeLabel: '송금',
+    statusLabel: '처리 중',
+    timelineSteps: ['송금 요청 접수', '처리 중'],
+    noticeText: '금융망에서 처리 중이에요. 곧 결과가 반영돼요.',
+    statusIcon: 'loader',
+  },
+  checking: {
+    heroStyle: 'reversed',
+    heroLabel: '확인 중',
+    heroMessage: '거래 처리 결과를 확인하고 있어요.',
+    typeLabel: '송금',
+    statusLabel: '확인 중',
+    timelineSteps: ['송금 요청 접수', '처리 중', '금융망 응답 확인 중'],
+    noticeText: '시스템에서 거래 결과를 확인하고 있어요. 잠시 후 다시 확인해주세요.',
+    statusIcon: 'clock',
   },
 };
 
@@ -487,16 +462,77 @@ const cardStyles = StyleSheet.create({
 
 // ── 메인 스크린 ──────────────────────────────────────────────────
 export default function TransactionDetailScreen({ route, navigation }) {
-  const params = route?.params ?? {};
-  const status = DETAIL_FALLBACKS[params.status] ? params.status : 'completed';
+  const dispatch = useDispatch();
+  const transactionDetail = useSelector(state => state.asset.transactionDetail);
+  const transactionDetailLoading = useSelector(state => state.asset.transactionDetailLoading);
+  const transactionDetailError = useSelector(state => state.asset.transactionDetailError);
 
-  // requestedAt은 fallback 우선 — route.params.time('오늘 12:10' 형식)이 덮어쓰지 않도록 보호
-  const detail = {
-    ...DETAIL_FALLBACKS[status],
-    ...params,
-    requestedAt: params.requestedAt ?? DETAIL_FALLBACKS[status].requestedAt,
-  };
+  const params = route?.params ?? {};
+  const { transactionId } = params;
+
+  useEffect(() => {
+    if (transactionId) {
+      dispatch(fetchTransactionDetail(transactionId));
+    }
+  }, [transactionId, dispatch]);
+
+  const handleBack = () =>
+    navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
+
+  const handleConfirm = () =>
+    navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
+
+  if (transactionDetailLoading) {
+    return (
+      <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
+        <View style={screenStyles.screen}>
+          <DetailHeader onBack={handleBack} />
+          <View style={screenStyles.centerState}>
+            <ActivityIndicator size="large" color={colors.olive} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (transactionDetailError || !transactionDetail) {
+    return (
+      <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
+        <View style={screenStyles.screen}>
+          <DetailHeader onBack={handleBack} />
+          <View style={screenStyles.centerState}>
+            <Feather name="alert-circle" size={40} color={colors.textLight} />
+            <Text style={screenStyles.errorText}>거래 상세를 불러오지 못했어요.</Text>
+            <Text style={screenStyles.errorSub}>잠시 후 다시 시도해주세요.</Text>
+          </View>
+          <View style={screenStyles.bottomArea}>
+            <Pressable
+              onPress={handleBack}
+              style={({ pressed }) => [
+                screenStyles.confirmBtn,
+                pressed && screenStyles.confirmBtnPressed,
+              ]}
+            >
+              <Text style={screenStyles.confirmBtnText}>돌아가기</Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const apiStatus = mapTransactionStatus(transactionDetail.status);
+  const status = STATUS_UI_CONFIG[apiStatus] ? apiStatus : 'checking';
   const uiConfig = STATUS_UI_CONFIG[status];
+
+  const detail = {
+    transactionId: transactionDetail.id,
+    status: apiStatus,
+    counterparty: transactionDetail.counterparty ?? '-',
+    amount: transactionDetail.amount ?? 0,
+    requestedAt: transactionDetail.requestedAt ?? '-',
+    memo: transactionDetail.memo ?? '-',
+  };
 
   const infoRows = [
     { label: '거래 유형', value: uiConfig.typeLabel },
@@ -506,12 +542,6 @@ export default function TransactionDetailScreen({ route, navigation }) {
     { label: '현재 상태', value: uiConfig.statusLabel },
     { label: '메모', value: detail.memo },
   ];
-
-  const handleBack = () =>
-    navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
-
-  const handleConfirm = () =>
-    navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
 
   return (
     <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
@@ -560,6 +590,22 @@ const screenStyles = StyleSheet.create({
   scrollContent: {
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
+  },
+  centerState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  errorText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textDark,
+    marginTop: spacing.md,
+  },
+  errorSub: {
+    fontSize: 13,
+    color: colors.textLight,
   },
   bottomArea: {
     paddingHorizontal: spacing.lg,

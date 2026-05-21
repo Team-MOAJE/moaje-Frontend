@@ -11,17 +11,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSelector, useDispatch } from 'react-redux';
 import { colors, radius, shadows } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import ProfileCard from '../../components/profile/ProfileCard';
-
-const MOCK_USER = {
-  name: '김민준',
-  email: 'minjun.kim@example.com',
-  school: '한신대학교',
-  joined: '가입 2026.05',
-  initial: '민',
-};
+import { logoutUser } from '../../features/auth/authApi';
 
 const LOGIN_INFO = [
   ['로그인 방식', '카카오 로그인'],
@@ -43,6 +37,8 @@ const MENUS = [
 ];
 
 export default function ProfileScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const user = useSelector(state => state.auth.user);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
@@ -78,9 +74,10 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const handleLogoutConfirm = () => {
-    // UI 전용: 현재 단계에서는 실제 로그아웃 처리를 하지 않음
+  const handleLogoutConfirm = async () => {
     setLogoutModalVisible(false);
+    await dispatch(logoutUser());
+    // RootNavigator가 isAuthenticated=false를 감지해 AuthNavigator로 자동 전환
   };
 
   return (
@@ -110,11 +107,11 @@ export default function ProfileScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         >
           <ProfileCard
-            name={MOCK_USER.name}
-            email={MOCK_USER.email}
-            school={MOCK_USER.school}
-            joined={MOCK_USER.joined}
-            initial={MOCK_USER.initial}
+            name={user?.name ?? '-'}
+            email={user?.email ?? '-'}
+            school={user?.school ?? '-'}
+            joined={user?.joinedAt ? `가입 ${user.joinedAt.slice(0, 7).replace('-', '.')}` : '-'}
+            initial={user?.name?.charAt(0) ?? '?'}
           />
 
           {/* 로그인 정보 카드 */}

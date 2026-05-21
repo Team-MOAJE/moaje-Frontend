@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
 
-export default function AppHeader({ onBellPress }) {
+export default function AppHeader({ onBellPress, userName }) {
   return (
     <View style={styles.container}>
       <View style={styles.left}>
@@ -17,7 +17,9 @@ export default function AppHeader({ onBellPress }) {
           <Text style={styles.logoEmoji}>🌱</Text>
         </LinearGradient>
         <View style={styles.greetingBox}>
-          <Text style={styles.greeting}>안녕하세요, 김민준님</Text>
+          <Text style={styles.greeting}>
+            {userName ? `안녕하세요, ${userName}님` : '안녕하세요'}
+          </Text>
           <Text style={styles.sub}>오늘의 안전 소비 한도를 확인해보세요</Text>
         </View>
       </View>

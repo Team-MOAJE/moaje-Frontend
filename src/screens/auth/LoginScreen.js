@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,11 +21,15 @@ const C = {
 
 const LoginScreen = ({ navigation }) => {
   const handleKakaoLogin = () => {
-    // TODO: API Gateway 개발 완료 후 카카오 로그인 API 연결
+    // SDK 연동 전 — 가짜 token을 API로 전송하지 않음
+    // SDK 연동 후 교체: const token = await KakaoSDK.login(); dispatch(loginUser({ provider: 'kakao', providerToken: token }));
+    Alert.alert('준비 중', '카카오 로그인은 현재 준비 중이에요.');
   };
 
   const handleGoogleLogin = () => {
-    // TODO: API Gateway 개발 완료 후 구글 로그인 API 연결
+    // SDK 연동 전 — 가짜 token을 API로 전송하지 않음
+    // SDK 연동 후 교체: const token = await GoogleSignIn.signIn(); dispatch(loginUser({ provider: 'google', providerToken: token }));
+    Alert.alert('준비 중', '구글 로그인은 현재 준비 중이에요.');
   };
 
   return (
@@ -67,16 +71,16 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.buttons}>
           <TouchableOpacity
             onPress={handleKakaoLogin}
-            activeOpacity={0.85}
-            style={[styles.btnKakao, styles.shadowSm]}
+            activeOpacity={0.7}
+            style={[styles.btnKakao, styles.shadowSm, styles.btnComingSoon]}
           >
             <Text style={styles.btnKakaoText}>카카오로 로그인</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={handleGoogleLogin}
-            activeOpacity={0.85}
-            style={[styles.btnGoogle, styles.shadowSm]}
+            activeOpacity={0.7}
+            style={[styles.btnGoogle, styles.shadowSm, styles.btnComingSoon]}
           >
             <Text style={styles.btnGoogleText}>Google로 로그인</Text>
           </TouchableOpacity>
@@ -196,6 +200,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 28,
     elevation: 8,
+  },
+  btnComingSoon: {
+    opacity: 0.6,
   },
 });
 

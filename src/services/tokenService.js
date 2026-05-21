@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
+import { API_ENDPOINTS } from '../constants/apiEndpoints';
 
 const SECURE_KEY_ACCESS_TOKEN = 'ACCESS_TOKEN';
 const SECURE_KEY_REFRESH_TOKEN = 'REFRESH_TOKEN';
@@ -55,9 +56,9 @@ export const refreshAccessToken = async () => {
     throw new Error('No refresh token available');
   }
 
-  const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL;
+  const baseURL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
 
-  const response = await axios.post(`${baseURL}/api/auth/refresh`, {
+  const response = await axios.post(`${baseURL}${API_ENDPOINTS.AUTH.REFRESH}`, {
     refreshToken,
   });
 

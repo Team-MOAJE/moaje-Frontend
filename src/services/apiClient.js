@@ -1,31 +1,49 @@
 import axios from 'axios';
 import { getAccessToken, refreshAccessToken, clearTokens } from './tokenService';
-import { generateIdempotencyKey } from '../utils/idempotencyKey';
+import { ensureIdempotencyKey } from '../utils/idempotencyKey';
 import { API_CODES } from '../constants/apiCodes';
 import { REQUIRED_ACTIONS } from '../constants/requiredActions';
+import { API_HEADERS } from '../constants/apiHeaders';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || '';
 const TIMEOUT = Number(process.env.EXPO_PUBLIC_API_TIMEOUT) || 10000;
+
+if (__DEV__ && !BASE_URL) {
+  console.warn(
+    '[apiClient] EXPO_PUBLIC_API_BASE_URL이 설정되지 않았습니다. .env에 Gateway URL을 채워주세요.'
+  );
+}
 
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: TIMEOUT,
   headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+    [API_HEADERS.CONTENT_TYPE]: 'application/json',
+    [API_HEADERS.ACCEPT]: 'application/json',
   },
 });
 
 apiClient.interceptors.request.use(
   async config => {
+    if (!BASE_URL) {
+      return Promise.reject(
+        Object.assign(new Error('서버 연결 설정이 아직 준비되지 않았어요.'), {
+          isConfigError: true,
+        })
+      );
+    }
+
+    config.headers = config.headers ?? {};
+
     const token = await getAccessToken();
 
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers[API_HEADERS.AUTHORIZATION] = `Bearer ${token}`;
     }
 
     if (config.idempotent) {
-      config.headers['Idempotency-Key'] = generateIdempotencyKey();
+      const existingKey = config.headers?.[API_HEADERS.IDEMPOTENCY_KEY] ?? config.idempotencyKey;
+      config.headers[API_HEADERS.IDEMPOTENCY_KEY] = ensureIdempotencyKey(existingKey);
     }
 
     return config;
@@ -46,6 +64,10 @@ apiClient.interceptors.response.use(
     return Promise.reject(apiError);
   },
   async error => {
+    if (error.isConfigError) {
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
     const envelope = error.response?.data;
 
@@ -67,7 +89,7 @@ apiClient.interceptors.response.use(
 
       try {
         const newAccessToken = await refreshAccessToken();
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        originalRequest.headers[API_HEADERS.AUTHORIZATION] = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch {
         await clearTokens();

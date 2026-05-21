@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,26 +12,47 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useSelector, useDispatch } from 'react-redux';
 import { colors, radius, shadows, spacing } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import BottomNavBar from '../../components/home/BottomNavBar';
 import { formatKRW } from '../../utils/formatMoney';
-
-const MOCK_ACCOUNT = {
-  bank: '카카오뱅크 생활비 통장',
-  token: 'acct_****_7F2A',
-  balance: 246000,
-};
+import { fetchAccounts, transferFunds } from '../../features/asset/assetApi';
+import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
+import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
 
 const RECENT = ['이서연', '박지호', '스터디회비', '교재공구'];
 const QUICK_AMOUNTS = [10000, 50000, 100000];
 
 export default function TransferScreen({ navigation }) {
+  const dispatch = useDispatch();
+  const accounts = useSelector(state => state.asset.accounts);
+  const accountsLoading = useSelector(state => state.asset.accountsLoading);
+  const transferLoading = useSelector(state => state.asset.transferLoading);
+  const defaultAccount = selectDefaultAccount(accounts);
+
   const [amount, setAmount] = useState(0);
   const [recipient, setRecipient] = useState('');
   const [memo, setMemo] = useState('');
 
-  const isActive = amount > 0 && recipient.length > 0;
+  // 한 번 확정된 송금 요청에 대한 멱등성 키 — 자동 재시도 시 동일 키 재사용
+  const pendingIdempotencyKeyRef = useRef(null);
+
+  const getCurrentTransferKey = () => {
+    pendingIdempotencyKeyRef.current = ensureIdempotencyKey(pendingIdempotencyKeyRef.current);
+    return pendingIdempotencyKeyRef.current;
+  };
+
+  const clearPendingTransferKey = () => {
+    pendingIdempotencyKeyRef.current = null;
+  };
+
+  const isActive =
+    amount > 0 && recipient.length > 0 && !accountsLoading && !transferLoading && !!defaultAccount;
+
+  useEffect(() => {
+    dispatch(fetchAccounts());
+  }, [dispatch]);
 
   const handleBackPress = () => {
     if (navigation.canGoBack()) navigation.goBack();
@@ -40,17 +61,61 @@ export default function TransferScreen({ navigation }) {
   const handleAmountChange = text => {
     const n = parseInt(text.replace(/[^0-9]/g, '') || '0', 10);
     setAmount(n);
+    clearPendingTransferKey();
   };
 
-  const handleQuickAmount = add => setAmount(prev => prev + add);
-  const handleMaxAmount = () => setAmount(MOCK_ACCOUNT.balance);
-  const handleRecipientSelect = name => setRecipient(name);
+  const handleQuickAmount = add => {
+    setAmount(prev => prev + add);
+    clearPendingTransferKey();
+  };
+
+  const handleMaxAmount = () => {
+    setAmount(defaultAccount?.balance ?? 0);
+    clearPendingTransferKey();
+  };
+
+  const handleRecipientChange = text => {
+    setRecipient(text);
+    clearPendingTransferKey();
+  };
+
+  const handleRecipientSelect = name => {
+    setRecipient(name);
+    clearPendingTransferKey();
+  };
+
+  const handleMemoChange = text => {
+    setMemo(text);
+    clearPendingTransferKey();
+  };
 
   const handleTransferPress = () => {
-    if (!isActive) return;
+    if (!isActive || transferLoading) return;
     Alert.alert('확인', `${recipient}님에게 ${formatKRW(amount)}을 송금할까요?`, [
       { text: '취소', style: 'cancel' },
-      { text: '확인', onPress: () => Alert.alert('완료', '송금이 완료되었습니다.') },
+      {
+        text: '확인',
+        onPress: async () => {
+          const result = await dispatch(
+            transferFunds({
+              fromAccountId: defaultAccount?.id,
+              toRecipient: recipient,
+              amount,
+              memo,
+              idempotencyKey: getCurrentTransferKey(),
+            })
+          );
+          if (transferFunds.fulfilled.match(result)) {
+            clearPendingTransferKey();
+            Alert.alert('완료', '송금이 완료됐어요.');
+            dispatch(fetchAccounts());
+            navigation.goBack();
+          } else {
+            // 실패 시 키를 유지 — 사용자가 폼을 수정하지 않고 재시도하면 동일 키 재사용
+            Alert.alert('송금 실패', result.payload?.message ?? '송금에 실패했습니다.');
+          }
+        },
+      },
     ]);
   };
 
@@ -92,13 +157,17 @@ export default function TransferScreen({ navigation }) {
                     <Text style={styles.accountIconText}>₩</Text>
                   </View>
                   <View style={styles.accountInfo}>
-                    <Text style={styles.accountBank}>{MOCK_ACCOUNT.bank}</Text>
-                    <Text style={styles.accountToken}>{MOCK_ACCOUNT.token}</Text>
+                    <Text style={styles.accountBank}>
+                      {defaultAccount?.bankName ?? '계좌 정보를 불러오는 중...'}
+                    </Text>
+                    <Text style={styles.accountToken}>{defaultAccount?.tokenId ?? '-'}</Text>
                   </View>
                 </View>
                 <View style={styles.balanceWrap}>
                   <Text style={styles.balanceLabel}>출금 가능</Text>
-                  <Text style={styles.balanceAmount}>{formatKRW(MOCK_ACCOUNT.balance)}</Text>
+                  <Text style={styles.balanceAmount}>
+                    {formatKRW(defaultAccount?.balance ?? 0)}
+                  </Text>
                 </View>
               </View>
               <View style={styles.noticeBanner}>
@@ -117,7 +186,7 @@ export default function TransferScreen({ navigation }) {
                   placeholder="이름 또는 등록된 계좌 토큰"
                   placeholderTextColor={colors.textLight}
                   value={recipient}
-                  onChangeText={setRecipient}
+                  onChangeText={handleRecipientChange}
                   returnKeyType="done"
                 />
               </View>
@@ -187,7 +256,7 @@ export default function TransferScreen({ navigation }) {
                   placeholder="예: 점심값, 교재비, 스터디 회비"
                   placeholderTextColor={colors.textLight}
                   value={memo}
-                  onChangeText={setMemo}
+                  onChangeText={handleMemoChange}
                   returnKeyType="done"
                 />
               </View>

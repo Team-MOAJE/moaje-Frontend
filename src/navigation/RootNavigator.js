@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { restoreSession } from '../features/auth/authApi';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { ROUTES } from '../constants/routes';
@@ -39,7 +40,13 @@ const DevPreviewNavigator = () => (
 );
 
 const RootNavigator = () => {
+  const dispatch = useDispatch();
   const isAuthenticated = useSelector(state => state.auth.isAuthenticated);
+  const isSessionRestored = useSelector(state => state.auth.isSessionRestored);
+
+  useEffect(() => {
+    dispatch(restoreSession());
+  }, [dispatch]);
 
   return (
     <NavigationContainer>
@@ -47,6 +54,8 @@ const RootNavigator = () => {
         <DevPreviewNavigator />
       ) : __DEV__ && ENABLE_DEV_MAIN ? (
         <MainNavigator />
+      ) : !isSessionRestored ? (
+        <SplashLoadingScreen />
       ) : isAuthenticated ? (
         <MainNavigator />
       ) : (

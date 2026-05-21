@@ -3,14 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadows } from '../../theme';
 
-const INFO_ITEMS = [
-  { label: '현재 잔액', value: '246,000원' },
-  { label: '예정 알바비', value: '320,000원' },
-  { label: '남은 고정지출', value: '150,000원' },
-  { label: '이벤트 예비비', value: '36,500원' },
-];
+export default function DailyLimitCard({ onPress, amount, daysLeft, formulaItems }) {
+  const safeItems = formulaItems ?? [];
+  const displayAmount = amount != null ? `${Number(amount).toLocaleString()}원` : '-';
+  const displayDays = daysLeft != null ? `다음 알바비까지 ${daysLeft}일 남았어요` : '';
 
-export default function DailyLimitCard({ onPress }) {
   return (
     <TouchableOpacity activeOpacity={0.97} style={styles.wrapper} onPress={onPress}>
       <LinearGradient
@@ -27,17 +24,24 @@ export default function DailyLimitCard({ onPress }) {
           <Text style={styles.label}>오늘 안전하게 쓸 수 있는 금액</Text>
         </View>
 
-        <Text style={styles.amount}>18,500원</Text>
-        <Text style={styles.subtitle}>다음 알바비까지 7일 남았어요</Text>
+        <Text style={styles.amount}>{displayAmount}</Text>
+        {!!displayDays && <Text style={styles.subtitle}>{displayDays}</Text>}
 
-        <View style={styles.infoGrid}>
-          {INFO_ITEMS.map(item => (
-            <View key={item.label} style={styles.infoBox}>
-              <Text style={styles.infoLabel}>{item.label}</Text>
-              <Text style={styles.infoValue}>{item.value}</Text>
-            </View>
-          ))}
-        </View>
+        {safeItems.length > 0 && (
+          <View style={styles.infoGrid}>
+            {safeItems.slice(0, 4).map(item => (
+              <View key={item.label} style={styles.infoBox}>
+                <Text style={styles.infoLabel}>{item.label}</Text>
+                <Text style={styles.infoValue}>
+                  {item.displayValue ??
+                    (item.unit
+                      ? `${item.value}${item.unit}`
+                      : `${Number(item.value).toLocaleString()}원`)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </LinearGradient>
     </TouchableOpacity>
   );

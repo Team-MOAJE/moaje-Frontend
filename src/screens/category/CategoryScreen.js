@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSelector } from 'react-redux';
 import { colors, radius, shadows } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import CategoryListItem from '../../components/category/CategoryListItem';
@@ -68,6 +69,7 @@ const MENU_ITEMS = [
 ];
 
 export default function CategoryScreen({ navigation }) {
+  const user = useSelector(state => state.auth.user);
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(8)).current;
@@ -111,7 +113,7 @@ export default function CategoryScreen({ navigation }) {
             end={{ x: 1, y: 1 }}
             style={styles.headerBanner}
           >
-            <ProfileCardHeader />
+            <ProfileCardHeader user={user} />
           </LinearGradient>
 
           <View style={styles.menuWrap}>
@@ -161,16 +163,23 @@ export default function CategoryScreen({ navigation }) {
   );
 }
 
-function ProfileCardHeader() {
+function ProfileCardHeader({ user }) {
+  const initial = user?.name?.charAt(0) ?? '?';
+  const name = user?.name ?? '-';
+  const email = user?.email ?? '-';
+  const joinedLabel = user?.joinedAt
+    ? `가입일 ${user.joinedAt.slice(0, 7).replace('-', '.')} · MVP 베타`
+    : 'MVP 베타';
+
   return (
     <View style={headerStyles.row}>
       <View style={headerStyles.avatar}>
-        <Text style={headerStyles.avatarText}>민</Text>
+        <Text style={headerStyles.avatarText}>{initial}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={headerStyles.name}>김민준</Text>
-        <Text style={headerStyles.sub}>대학생 · minjun.kim@example.com</Text>
-        <Text style={headerStyles.meta}>가입일 2026.05 · MVP 베타</Text>
+        <Text style={headerStyles.name}>{name}</Text>
+        <Text style={headerStyles.sub}>대학생 · {email}</Text>
+        <Text style={headerStyles.meta}>{joinedLabel}</Text>
       </View>
     </View>
   );

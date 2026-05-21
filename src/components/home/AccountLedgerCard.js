@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
 
-export default function AccountLedgerCard() {
+export default function AccountLedgerCard({ bankName, tokenId, balance }) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -25,10 +25,12 @@ export default function AccountLedgerCard() {
           <Text style={styles.accountIconText}>₩</Text>
         </LinearGradient>
         <View style={styles.accountInfo}>
-          <Text style={styles.bankName}>카카오뱅크 생활비 통장</Text>
-          <Text style={styles.tokenId}>acct_***_7F2A</Text>
+          <Text style={styles.bankName}>{bankName ?? '-'}</Text>
+          <Text style={styles.tokenId}>{tokenId ?? '-'}</Text>
         </View>
-        <Text style={styles.balance}>246,000원</Text>
+        <Text style={styles.balance}>
+          {balance != null ? `${Number(balance).toLocaleString()}원` : '-'}
+        </Text>
       </View>
 
       <View style={styles.updateRow}>
