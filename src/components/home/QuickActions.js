@@ -4,37 +4,27 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
 
-function PrimaryButton({ label, iconName, onPress }) {
+function QuickActionButton({ label, iconName, onPress }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.buttonWrapper, pressed && styles.buttonWrapperPressed]}
-    >
-      <LinearGradient
-        colors={[colors.olive, colors.oliveDeep]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.buttonInner}
-      >
-        <Feather name={iconName} size={20} color={colors.white} />
-        <Text style={styles.primaryLabel}>{label}</Text>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-function DefaultButton({ label, iconName, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.buttonWrapper,
-        styles.defaultButton,
-        pressed && styles.defaultButtonPressed,
-      ]}
-    >
-      <Feather name={iconName} size={20} color={colors.textDark} />
-      <Text style={styles.defaultLabel}>{label}</Text>
+    <Pressable onPress={onPress} style={styles.buttonWrapper}>
+      {({ pressed }) =>
+        pressed ? (
+          <LinearGradient
+            colors={[colors.olive, colors.oliveDeep]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.buttonInner}
+          >
+            <Feather name={iconName} size={20} color={colors.white} />
+            <Text style={styles.primaryLabel}>{label}</Text>
+          </LinearGradient>
+        ) : (
+          <View style={[styles.buttonInner, styles.defaultButton]}>
+            <Feather name={iconName} size={20} color={colors.textDark} />
+            <Text style={styles.defaultLabel}>{label}</Text>
+          </View>
+        )
+      }
     </Pressable>
   );
 }
@@ -54,10 +44,10 @@ function ComingSoonButton({ label, iconName }) {
 export default function QuickActions({ onTransfer, onHistory, onAnalysis }) {
   return (
     <View style={styles.container}>
-      <PrimaryButton label="송금하기" iconName="send" onPress={onTransfer} />
+      <QuickActionButton label="송금하기" iconName="send" onPress={onTransfer} />
       <ComingSoonButton label="계좌 연결" iconName="link-2" />
-      <DefaultButton label="거래내역" iconName="file-text" onPress={onHistory} />
-      <DefaultButton label="생활비 분석" iconName="pie-chart" onPress={onAnalysis} />
+      <QuickActionButton label="거래내역" iconName="file-text" onPress={onHistory} />
+      <QuickActionButton label="생활비 분석" iconName="pie-chart" onPress={onAnalysis} />
     </View>
   );
 }
@@ -73,9 +63,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: radius.lg,
     ...shadows.sm,
-  },
-  buttonWrapperPressed: {
-    opacity: 0.75,
   },
   buttonInner: {
     borderRadius: radius.lg,
@@ -98,9 +85,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 14,
     gap: 6,
-  },
-  defaultButtonPressed: {
-    backgroundColor: colors.bgOuter,
   },
   defaultLabel: {
     fontSize: 11,

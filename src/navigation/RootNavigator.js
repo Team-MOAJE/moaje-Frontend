@@ -19,6 +19,8 @@ import DevComponentStatesScreen from '../screens/dev/DevComponentStatesScreen';
 // ── 개발용 미리보기 토글 ───────────────────────────────────────
 // false 로 변경하면 기존 앱 시작 흐름(로그인 → 홈)으로 즉시 복원됩니다
 const ENABLE_DEV_STATE_PREVIEW = __DEV__ && false;
+// true 로 변경하면 로그인 없이 바로 홈화면으로 진입합니다 (확인 후 false 로 복원)
+const ENABLE_DEV_MAIN = __DEV__ && false;
 
 const DevStack = createNativeStackNavigator();
 
@@ -43,6 +45,8 @@ const RootNavigator = () => {
     <NavigationContainer>
       {__DEV__ && ENABLE_DEV_STATE_PREVIEW ? (
         <DevPreviewNavigator />
+      ) : __DEV__ && ENABLE_DEV_MAIN ? (
+        <MainNavigator />
       ) : isAuthenticated ? (
         <MainNavigator />
       ) : (

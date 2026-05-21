@@ -13,7 +13,7 @@ import { ROUTES } from '../../constants/routes';
 
 export default function HomeScreen({ navigation }) {
   const handleBellPress = () => {};
-  const handleTransferPress = () => {};
+  const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
   const handleConnectAccountPress = () => {};
   const handleTransactionHistoryPress = () => navigation.navigate(ROUTES.TRANSACTION_HISTORY);
   const handleAnalysisPress = () => navigation.navigate(ROUTES.DAILY_LIMIT);
