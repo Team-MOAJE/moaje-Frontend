@@ -2,6 +2,7 @@ export const ROUTES = {
   AUTH_STACK: 'AuthStack',
   LOGIN: 'Login',
   SIGNUP: 'Signup',
+  ID_LOGIN: 'IdLogin',
   MAIN_STACK: 'MainStack',
   HOME: 'Home',
   ACCOUNT_LIST: 'AccountList',

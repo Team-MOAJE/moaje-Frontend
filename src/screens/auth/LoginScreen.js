@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { ROUTES } from '../../constants/routes';
 
 const C = {
   bgGrad: ['#F3F6EA', '#E8F0CF', 'rgba(184,216,107,0.4)'],
@@ -20,6 +21,9 @@ const C = {
 };
 
 const LoginScreen = ({ navigation }) => {
+  const handleIdLogin = () => navigation.navigate(ROUTES.ID_LOGIN);
+  const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
+
   const handleKakaoLogin = () => {
     // SDK 연동 전 — 가짜 token을 API로 전송하지 않음
     // SDK 연동 후 교체: const token = await KakaoSDK.login(); dispatch(loginUser({ provider: 'kakao', providerToken: token }));
@@ -69,6 +73,23 @@ const LoginScreen = ({ navigation }) => {
 
         {/* ── 버튼 영역 ─────────────────────────────── */}
         <View style={styles.buttons}>
+          {/* 1. 아이디 로그인 — 올리브 메인 버튼 */}
+          <TouchableOpacity
+            onPress={handleIdLogin}
+            activeOpacity={0.85}
+            style={[styles.btnIdLogin, styles.shadowMd]}
+          >
+            <Text style={styles.btnIdLoginText}>아이디 로그인</Text>
+          </TouchableOpacity>
+
+          {/* 2. 구분선 */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>또는</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* 3. 카카오 로그인 */}
           <TouchableOpacity
             onPress={handleKakaoLogin}
             activeOpacity={0.7}
@@ -77,6 +98,7 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.btnKakaoText}>카카오로 로그인</Text>
           </TouchableOpacity>
 
+          {/* 4. Google 로그인 */}
           <TouchableOpacity
             onPress={handleGoogleLogin}
             activeOpacity={0.7}
@@ -84,6 +106,14 @@ const LoginScreen = ({ navigation }) => {
           >
             <Text style={styles.btnGoogleText}>Google로 로그인</Text>
           </TouchableOpacity>
+
+          {/* 5. 회원가입 링크 */}
+          <View style={styles.signupRow}>
+            <Text style={styles.signupLabel}>계정이 없으신가요? </Text>
+            <TouchableOpacity onPress={handleSignup} activeOpacity={0.5}>
+              <Text style={styles.signupLink}>회원가입</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -187,12 +217,66 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: C.textDark,
   },
+  // 아이디 로그인 버튼 (메인 올리브)
+  btnIdLogin: {
+    paddingVertical: 14,
+    borderRadius: 16,
+    backgroundColor: C.textMid,
+    alignItems: 'center',
+  },
+  btnIdLoginText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.white,
+  },
+
+  // 구분선
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 2,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(111,127,63,0.15)',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: 'rgba(111,127,63,0.5)',
+  },
+
+  // 회원가입 링크 행
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 4,
+  },
+  signupLabel: {
+    fontSize: 12,
+    color: 'rgba(111,127,63,0.7)',
+  },
+  signupLink: {
+    fontSize: 12,
+    color: C.textMid,
+    textDecorationLine: 'underline',
+  },
+
   shadowSm: {
     shadowColor: '#344225',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+  },
+  shadowMd: {
+    shadowColor: '#344225',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 3,
   },
   shadowLg: {
     shadowColor: '#344225',
