@@ -76,8 +76,9 @@ const LoginScreen = ({ navigation }) => {
           {/* 1. 아이디 로그인 — 올리브 메인 버튼 */}
           <TouchableOpacity
             onPress={handleIdLogin}
+            disabled={true}
             activeOpacity={0.85}
-            style={[styles.btnIdLogin, styles.shadowMd]}
+            style={[styles.btnIdLogin, styles.shadowMd, styles.btnComingSoon]}
           >
             <Text style={styles.btnIdLoginText}>아이디 로그인</Text>
           </TouchableOpacity>
@@ -110,7 +111,12 @@ const LoginScreen = ({ navigation }) => {
           {/* 5. 회원가입 링크 */}
           <View style={styles.signupRow}>
             <Text style={styles.signupLabel}>계정이 없으신가요? </Text>
-            <TouchableOpacity onPress={handleSignup} activeOpacity={0.5}>
+            <TouchableOpacity
+              onPress={handleSignup}
+              disabled={true}
+              activeOpacity={0.5}
+              style={styles.btnComingSoon}
+            >
               <Text style={styles.signupLink}>회원가입</Text>
             </TouchableOpacity>
           </View>
