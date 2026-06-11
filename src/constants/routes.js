@@ -12,6 +12,7 @@ export const ROUTES = {
   MFA_SCREEN: 'MFAScreen',
   SUPPORT_SCREEN: 'SupportScreen',
   CATEGORY: 'Category',
+  MONEY_RECAP: 'MoneyRecap',
   PROFILE: 'Profile',
   SETTINGS: 'Settings',
   TRANSACTION_HISTORY: 'TransactionHistory',

@@ -39,11 +39,11 @@ const MENU_ITEMS = [
     routeAction: ROUTES.DAILY_LIMIT,
   },
   {
-    iconName: 'moon',
-    title: '낭만 달빛',
-    desc: '대학생 감성 활동 추천',
-    variant: 'comingSoon',
-    routeAction: null,
+    iconName: 'bar-chart-2',
+    title: '머니 리캡',
+    desc: '이번 학기 소비 흐름 한눈에 보기',
+    variant: 'active',
+    routeAction: ROUTES.MONEY_RECAP,
   },
   {
     iconName: 'repeat',

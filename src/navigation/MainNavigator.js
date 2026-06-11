@@ -10,6 +10,7 @@ import RecommendationScreen from '../screens/work/RecommendationScreen';
 import MFAScreen from '../screens/auth/MFAScreen';
 import SupportScreen from '../screens/support/SupportScreen';
 import CategoryScreen from '../screens/category/CategoryScreen';
+import MoneyRecapScreen from '../screens/asset/MoneyRecapScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import TransactionHistoryScreen from '../screens/asset/TransactionHistoryScreen';
@@ -62,6 +63,11 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.CATEGORY}
       component={CategoryScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.MONEY_RECAP}
+      component={MoneyRecapScreen}
       options={{ headerShown: false }}
     />
     <Stack.Screen
