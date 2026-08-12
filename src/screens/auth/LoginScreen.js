@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,30 +11,15 @@ const C = {
   textDark: '#344225',
   textMid: '#6F7F3F',
   textDesc: 'rgba(111,127,63,0.8)',
-  kakaoText: '#3C1E1E',
-  yellow: '#FEE500',
   orange: '#FF9F1C',
   cream: '#FFFDF5',
   bgWarn: '#FFF8E6',
-  border: '#E8EBD8',
   white: '#FFFFFF',
 };
 
 const LoginScreen = ({ navigation }) => {
   const handleIdLogin = () => navigation.navigate(ROUTES.ID_LOGIN);
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
-
-  const handleKakaoLogin = () => {
-    // SDK 연동 전 — 가짜 token을 API로 전송하지 않음
-    // SDK 연동 후 교체: const token = await KakaoSDK.login(); dispatch(loginUser({ provider: 'kakao', providerToken: token }));
-    Alert.alert('준비 중', '카카오 로그인은 현재 준비 중이에요.');
-  };
-
-  const handleGoogleLogin = () => {
-    // SDK 연동 전 — 가짜 token을 API로 전송하지 않음
-    // SDK 연동 후 교체: const token = await GoogleSignIn.signIn(); dispatch(loginUser({ provider: 'google', providerToken: token }));
-    Alert.alert('준비 중', '구글 로그인은 현재 준비 중이에요.');
-  };
 
   return (
     <LinearGradient colors={C.bgGrad} locations={[0, 0.5, 1]} style={styles.gradient}>
@@ -73,50 +58,19 @@ const LoginScreen = ({ navigation }) => {
 
         {/* ── 버튼 영역 ─────────────────────────────── */}
         <View style={styles.buttons}>
-          {/* 1. 아이디 로그인 — 올리브 메인 버튼 */}
+          {/* 아이디 로그인 — 올리브 메인 버튼 */}
           <TouchableOpacity
             onPress={handleIdLogin}
-            disabled={true}
             activeOpacity={0.85}
-            style={[styles.btnIdLogin, styles.shadowMd, styles.btnComingSoon]}
+            style={[styles.btnIdLogin, styles.shadowMd]}
           >
             <Text style={styles.btnIdLoginText}>아이디 로그인</Text>
           </TouchableOpacity>
 
-          {/* 2. 구분선 */}
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* 3. 카카오 로그인 */}
-          <TouchableOpacity
-            onPress={handleKakaoLogin}
-            activeOpacity={0.7}
-            style={[styles.btnKakao, styles.shadowSm, styles.btnComingSoon]}
-          >
-            <Text style={styles.btnKakaoText}>카카오로 로그인</Text>
-          </TouchableOpacity>
-
-          {/* 4. Google 로그인 */}
-          <TouchableOpacity
-            onPress={handleGoogleLogin}
-            activeOpacity={0.7}
-            style={[styles.btnGoogle, styles.shadowSm, styles.btnComingSoon]}
-          >
-            <Text style={styles.btnGoogleText}>Google로 로그인</Text>
-          </TouchableOpacity>
-
-          {/* 5. 회원가입 링크 */}
+          {/* 회원가입 링크 */}
           <View style={styles.signupRow}>
             <Text style={styles.signupLabel}>계정이 없으신가요? </Text>
-            <TouchableOpacity
-              onPress={handleSignup}
-              disabled={true}
-              activeOpacity={0.5}
-              style={styles.btnComingSoon}
-            >
+            <TouchableOpacity onPress={handleSignup} activeOpacity={0.5}>
               <Text style={styles.signupLink}>회원가입</Text>
             </TouchableOpacity>
           </View>
@@ -200,29 +154,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: 10,
   },
-  btnKakao: {
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: C.yellow,
-    alignItems: 'center',
-  },
-  btnKakaoText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: C.kakaoText,
-  },
-  btnGoogle: {
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: C.white,
-    borderWidth: 1,
-    borderColor: C.border,
-    alignItems: 'center',
-  },
-  btnGoogleText: {
-    fontSize: 15,
-    color: C.textDark,
-  },
   // 아이디 로그인 버튼 (메인 올리브)
   btnIdLogin: {
     paddingVertical: 14,
@@ -234,23 +165,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: C.white,
-  },
-
-  // 구분선
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 2,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(111,127,63,0.15)',
-  },
-  dividerText: {
-    fontSize: 12,
-    color: 'rgba(111,127,63,0.5)',
   },
 
   // 회원가입 링크 행
@@ -290,9 +204,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 28,
     elevation: 8,
-  },
-  btnComingSoon: {
-    opacity: 0.6,
   },
 });
 
