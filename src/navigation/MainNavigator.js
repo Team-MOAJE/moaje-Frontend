@@ -68,7 +68,7 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.MONEY_RECAP}
       component={MoneyRecapScreen}
-      options={{ headerShown: false }}
+      options={{ headerShown: false, animation: 'none' }}
     />
     <Stack.Screen
       name={ROUTES.PROFILE}
