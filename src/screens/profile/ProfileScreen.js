@@ -18,7 +18,7 @@ import ProfileCard from '../../components/profile/ProfileCard';
 import { logoutUser } from '../../features/auth/authApi';
 
 const LOGIN_INFO = [
-  ['로그인 방식', '카카오 로그인'],
+  ['로그인 방식', '아이디 로그인'],
   ['세션 상태', '로그인 유지 중'],
   ['생체 인증', '사용 가능'],
 ];
@@ -108,7 +108,7 @@ export default function ProfileScreen({ navigation }) {
         >
           <ProfileCard
             name={user?.name ?? '-'}
-            email={user?.email ?? '-'}
+            userId={user?.userId ?? '-'}
             school={user?.school ?? '-'}
             joined={user?.joinedAt ? `가입 ${user.joinedAt.slice(0, 7).replace('-', '.')}` : '-'}
             initial={user?.name?.charAt(0) ?? '?'}

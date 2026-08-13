@@ -166,7 +166,7 @@ export default function CategoryScreen({ navigation }) {
 function ProfileCardHeader({ user }) {
   const initial = user?.name?.charAt(0) ?? '?';
   const name = user?.name ?? '-';
-  const email = user?.email ?? '-';
+  const userId = user?.userId ?? '-';
   const joinedLabel = user?.joinedAt
     ? `가입일 ${user.joinedAt.slice(0, 7).replace('-', '.')} · MVP 베타`
     : 'MVP 베타';
@@ -178,7 +178,7 @@ function ProfileCardHeader({ user }) {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={headerStyles.name}>{name}</Text>
-        <Text style={headerStyles.sub}>대학생 · {email}</Text>
+        <Text style={headerStyles.sub}>대학생 · {userId}</Text>
         <Text style={headerStyles.meta}>{joinedLabel}</Text>
       </View>
     </View>

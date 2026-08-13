@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, radius, shadows } from '../../theme';
 
-export default function ProfileCard({ name, email, school, joined, initial }) {
+export default function ProfileCard({ name, userId, school, joined, initial }) {
   return (
     <LinearGradient
       colors={[colors.oliveDark, colors.oliveLight]}
@@ -22,7 +22,7 @@ export default function ProfileCard({ name, email, school, joined, initial }) {
             <Text style={styles.badgeText}>MVP 베타</Text>
           </View>
         </View>
-        <Text style={styles.email}>{email}</Text>
+        <Text style={styles.userId}>{userId}</Text>
         {(school || joined) && (
           <Text style={styles.meta}>
             {school}
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.white,
   },
-  email: {
+  userId: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.9)',
     marginTop: 2,

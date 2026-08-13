@@ -4,6 +4,19 @@ import { getAccessToken, setTokens, clearTokens } from '../../services/tokenServ
 import { API_ENDPOINTS } from '../../constants/apiEndpoints';
 import { normalizeApiError } from '../../utils/normalizeApiError';
 
+// TODO: 백엔드 휴대폰 인증 API 명세 확정되면 API_ENDPOINTS.AUTH에 편입하고 아래 값을 실제 endpoint로 교체
+const PHONE_VERIFICATION_ENDPOINTS = {
+  request: null,
+  verify: null,
+};
+
+const requireEndpoint = endpoint => {
+  if (!endpoint) {
+    throw new Error('휴대폰 인증 API가 아직 준비되지 않았습니다.');
+  }
+  return endpoint;
+};
+
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
@@ -19,13 +32,10 @@ export const loginUser = createAsyncThunk(
 
 export const registerUser = createAsyncThunk(
   'auth/registerUser',
-  async (userData, { rejectWithValue, dispatch }) => {
+  async (userData, { rejectWithValue }) => {
     try {
-      await apiClient.post(API_ENDPOINTS.AUTH.REGISTER, userData);
-      const result = await dispatch(
-        loginUser({ email: userData.email, password: userData.password })
-      );
-      return result.payload;
+      const data = await apiClient.post(API_ENDPOINTS.AUTH.REGISTER, userData);
+      return data;
     } catch (error) {
       return rejectWithValue(normalizeApiError(error, '회원가입에 실패했습니다.'));
     }
@@ -69,6 +79,33 @@ export const fetchCurrentUser = createAsyncThunk(
       return await apiClient.get(API_ENDPOINTS.AUTH.ME);
     } catch (error) {
       return rejectWithValue(normalizeApiError(error, '사용자 정보를 불러오지 못했습니다.'));
+    }
+  }
+);
+
+export const requestPhoneVerification = createAsyncThunk(
+  'auth/requestPhoneVerification',
+  async (payload, { rejectWithValue }) => {
+    // payload/response 계약 미확정 — 백엔드 명세 확정 후 필드 매핑
+    try {
+      const endpoint = requireEndpoint(PHONE_VERIFICATION_ENDPOINTS.request);
+      const data = await apiClient.post(endpoint, payload);
+      return data;
+    } catch (error) {
+      return rejectWithValue(normalizeApiError(error, '인증번호 요청에 실패했습니다.'));
+    }
+  }
+);
+
+export const verifyPhoneVerification = createAsyncThunk(
+  'auth/verifyPhoneVerification',
+  async (payload, { rejectWithValue }) => {
+    try {
+      const endpoint = requireEndpoint(PHONE_VERIFICATION_ENDPOINTS.verify);
+      const data = await apiClient.post(endpoint, payload);
+      return data;
+    } catch (error) {
+      return rejectWithValue(normalizeApiError(error, '인증번호 확인에 실패했습니다.'));
     }
   }
 );
