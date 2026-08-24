@@ -18,10 +18,6 @@ import { colors, radius, shadows } from '../../theme';
 
 const BG_GRAD = ['#F3F6EA', '#E8F0CF', 'rgba(184,216,107,0.4)'];
 
-const validateUserId = v => /^[a-zA-Z0-9]{1,12}$/.test(v);
-const validatePassword = v =>
-  v.length > 0 && !/[\s가-힣]/.test(v) && /[!@#$%^&*()\-_=+[\]{};:'",.<>/?\\|`~]/.test(v);
-
 const IdLoginScreen = ({ navigation }) => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
@@ -30,13 +26,13 @@ const IdLoginScreen = ({ navigation }) => {
 
   const touchField = field => setTouched(t => ({ ...t, [field]: true }));
 
-  const handleUserIdChange = text => setUserId(text.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12));
+  const handleUserIdChange = text => setUserId(text);
 
-  const handlePasswordChange = text => setPassword(text.replace(/[\s가-힣]/g, ''));
+  const handlePasswordChange = text => setPassword(text);
 
-  const userIdInvalid = touched.userId && userId.length > 0 && !validateUserId(userId);
-  const passwordInvalid = touched.password && password.length > 0 && !validatePassword(password);
-  const allValid = validateUserId(userId) && validatePassword(password);
+  const userIdInvalid = touched.userId && userId.trim().length === 0;
+  const passwordInvalid = touched.password && password.length === 0;
+  const allValid = userId.trim().length > 0 && password.length > 0;
 
   const handleBack = () => navigation.popToTop();
 
@@ -90,11 +86,7 @@ const IdLoginScreen = ({ navigation }) => {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                {userIdInvalid && (
-                  <Text style={styles.errorText}>
-                    아이디는 영문과 숫자만 사용할 수 있고 최대 12자까지 가능해요.
-                  </Text>
-                )}
+                {userIdInvalid && <Text style={styles.errorText}>아이디를 입력해 주세요.</Text>}
               </View>
 
               {/* 비밀번호 */}
@@ -124,11 +116,7 @@ const IdLoginScreen = ({ navigation }) => {
                     />
                   </TouchableOpacity>
                 </View>
-                {passwordInvalid && (
-                  <Text style={styles.errorText}>
-                    비밀번호에는 특수문자가 1개 이상 포함되어야 해요.
-                  </Text>
-                )}
+                {passwordInvalid && <Text style={styles.errorText}>비밀번호를 입력해 주세요.</Text>}
               </View>
             </View>
 
