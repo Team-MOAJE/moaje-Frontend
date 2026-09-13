@@ -4,7 +4,6 @@
     "slug": "fintech-app-frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.moaje.fintechapp"
@@ -12,6 +11,6 @@
     "android": {
       "package": "com.moaje.fintechapp"
     },
-    "plugins": ["expo-secure-store", "expo-router"]
+    "plugins": ["expo-secure-store", "expo-status-bar", "expo-font"]
   }
 }
