@@ -183,7 +183,7 @@ export default function MoneyRecapStories({ onClose }) {
   return (
     <View style={styles.root}>
       <Pressable
-        style={StyleSheet.absoluteFill}
+        style={styles.touchLayer}
         onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
@@ -217,7 +217,8 @@ export default function MoneyRecapStories({ onClose }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden', backgroundColor: '#000' },
-  storyLayer: { ...StyleSheet.absoluteFillObject },
+  touchLayer: { flex: 1 },
+  storyLayer: { flex: 1 },
   progressOverlay: { position: 'absolute', left: 0, right: 0, zIndex: 50 },
   closeButtonWrap: { position: 'absolute', left: 16, zIndex: 51 },
   pausePill: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
