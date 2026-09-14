@@ -119,9 +119,10 @@ const SignupScreen = ({ navigation }) => {
 
   const handlePressPrivacyCheckbox = () => {
     if (privacyNoticeConfirmed) {
-      setPrivacyNoticeConfirmed(false); // 확인 완료 상태에서만 취소 가능. 다른 폼 데이터는 건드리지 않는다.
+      setPrivacyNoticeConfirmed(false); // 체크된 상태에서는 바로 체크 해제 (재확인은 Modal을 다시 열어서)
+    } else {
+      handleOpenPrivacyModal(); // 미확인 상태에서는 Modal을 열어야만 확인 가능 (우회 방지)
     }
-    // 미확인 상태에서는 아무 것도 하지 않는다 — Modal도 열지 않고 true로도 바꾸지 않는다 (우회 방지)
   };
 
   const handleConfirmPrivacyNotice = () => {
@@ -353,10 +354,7 @@ const SignupScreen = ({ navigation }) => {
 
               <View style={styles.termItemRow}>
                 <View style={styles.termCheckRow}>
-                  <TouchableOpacity
-                    onPress={handlePressPrivacyCheckbox}
-                    activeOpacity={privacyNoticeConfirmed ? 0.85 : 1}
-                  >
+                  <TouchableOpacity onPress={handlePressPrivacyCheckbox} activeOpacity={0.85}>
                     <View
                       style={[
                         styles.checkboxSm,
@@ -370,8 +368,12 @@ const SignupScreen = ({ navigation }) => {
                   </TouchableOpacity>
                   <Text style={styles.termItemText}>개인정보 처리 안내</Text>
                 </View>
-                <TouchableOpacity onPress={handleOpenPrivacyModal} activeOpacity={0.6}>
-                  <Text style={styles.termDetailLink}>안내 확인</Text>
+                <TouchableOpacity
+                  onPress={handleOpenPrivacyModal}
+                  activeOpacity={0.7}
+                  style={styles.privacyNoticeButton}
+                >
+                  <Text style={styles.privacyNoticeButtonText}>안내 확인</Text>
                 </TouchableOpacity>
               </View>
 
@@ -888,6 +890,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(111,127,63,0.6)',
     textDecorationLine: 'underline',
+  },
+  privacyNoticeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.olive,
+  },
+  privacyNoticeButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.white,
   },
   privacyPolicyLinkRow: {
     alignSelf: 'flex-start',
