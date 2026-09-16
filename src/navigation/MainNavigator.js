@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ROUTES } from '../constants/routes';
 import HomeScreen from '../screens/home/HomeScreen';
 import AccountListScreen from '../screens/asset/AccountListScreen';
+import AccountDetailScreen from '../screens/asset/AccountDetailScreen';
 import DailyLimitScreen from '../screens/asset/DailyLimitScreen';
 import AnalysisScreen from '../screens/asset/AnalysisScreen';
 import TransferScreen from '../screens/asset/TransferScreen';
@@ -33,6 +34,11 @@ const MainNavigator = () => (
       name={ROUTES.ACCOUNT_LIST}
       component={AccountListScreen}
       options={{ title: '내 계좌' }}
+    />
+    <Stack.Screen
+      name={ROUTES.ACCOUNT_DETAIL}
+      component={AccountDetailScreen}
+      options={{ headerShown: false, animation: 'none' }}
     />
     <Stack.Screen
       name={ROUTES.DAILY_LIMIT}

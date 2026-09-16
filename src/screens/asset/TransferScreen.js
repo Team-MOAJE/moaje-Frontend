@@ -24,12 +24,16 @@ import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
 const RECENT = ['이서연', '박지호', '스터디회비', '교재공구'];
 const QUICK_AMOUNTS = [10000, 50000, 100000];
 
-export default function TransferScreen({ navigation }) {
+export default function TransferScreen({ navigation, route }) {
   const dispatch = useDispatch();
   const accounts = useSelector(state => state.asset.accounts);
   const accountsLoading = useSelector(state => state.asset.accountsLoading);
   const transferLoading = useSelector(state => state.asset.transferLoading);
   const defaultAccount = selectDefaultAccount(accounts);
+  // AccountDetail의 "송금하기"에서 fromAccountId가 전달되면 해당 계좌를 우선 사용하고,
+  // 없으면(기존 진입 경로 전부) 기존처럼 기본 계좌를 사용한다.
+  const fromAccount = accounts.find(a => a.id === route?.params?.fromAccountId);
+  const selectedAccount = fromAccount ?? defaultAccount;
 
   const [amount, setAmount] = useState(0);
   const [recipient, setRecipient] = useState('');
@@ -48,7 +52,7 @@ export default function TransferScreen({ navigation }) {
   };
 
   const isActive =
-    amount > 0 && recipient.length > 0 && !accountsLoading && !transferLoading && !!defaultAccount;
+    amount > 0 && recipient.length > 0 && !accountsLoading && !transferLoading && !!selectedAccount;
 
   useEffect(() => {
     dispatch(fetchAccounts());
@@ -70,7 +74,7 @@ export default function TransferScreen({ navigation }) {
   };
 
   const handleMaxAmount = () => {
-    setAmount(defaultAccount?.balance ?? 0);
+    setAmount(selectedAccount?.balance ?? 0);
     clearPendingTransferKey();
   };
 
@@ -98,7 +102,7 @@ export default function TransferScreen({ navigation }) {
         onPress: async () => {
           const result = await dispatch(
             transferFunds({
-              fromAccountId: defaultAccount?.id,
+              fromAccountId: selectedAccount?.id,
               toRecipient: recipient,
               amount,
               memo,
@@ -158,15 +162,15 @@ export default function TransferScreen({ navigation }) {
                   </View>
                   <View style={styles.accountInfo}>
                     <Text style={styles.accountBank}>
-                      {defaultAccount?.bankName ?? '계좌 정보를 불러오는 중...'}
+                      {selectedAccount?.bankName ?? '계좌 정보를 불러오는 중...'}
                     </Text>
-                    <Text style={styles.accountToken}>{defaultAccount?.tokenId ?? '-'}</Text>
+                    <Text style={styles.accountToken}>{selectedAccount?.tokenId ?? '-'}</Text>
                   </View>
                 </View>
                 <View style={styles.balanceWrap}>
                   <Text style={styles.balanceLabel}>출금 가능</Text>
                   <Text style={styles.balanceAmount}>
-                    {formatKRW(defaultAccount?.balance ?? 0)}
+                    {formatKRW(selectedAccount?.balance ?? 0)}
                   </Text>
                 </View>
               </View>

@@ -30,6 +30,7 @@ import TransactionPeriodModal, {
   computePeriodRange,
   getPeriodLabel,
 } from './TransactionPeriodModal';
+import TransactionListItem from '../../components/asset/TransactionListItem';
 
 const FILTERS = ['전체', '입금', '출금', '송금', '실패/취소'];
 
@@ -59,38 +60,6 @@ const matchesFilter = (tx, f) => {
     default:
       return true;
   }
-};
-
-// ── 아이콘 매핑 (Feather) ─────────────────────────────────────
-const ICON_MAP = {
-  pending: { name: 'clock', bg: '#FFF8E6', fg: colors.orange },
-  checking: { name: 'clock', bg: '#FFF8E6', fg: colors.orange },
-  completed: { name: 'send', bg: '#F3F6EA', fg: colors.olive },
-  failed: { name: 'alert-triangle', bg: 'rgba(229,72,77,0.1)', fg: colors.red },
-  reversed: { name: 'rotate-ccw', bg: '#E8EBD8', fg: colors.olive },
-  depositCompleted: { name: 'arrow-down-left', bg: 'rgba(184,216,107,0.3)', fg: colors.textDark },
-  expenseCompleted: { name: 'file-text', bg: '#F3F6EA', fg: colors.olive },
-};
-
-// ── 상태 뱃지 설정 ─────────────────────────────────────────────
-const STATUS_CONFIG = {
-  pending: { label: '처리 중', bg: '#F3F6EA', fg: colors.olive, icon: 'loader' },
-  checking: { label: '확인 중', bg: '#FFF8E6', fg: colors.orange, icon: 'clock' },
-  completed: { label: '송금 완료', bg: 'rgba(47,158,68,0.1)', fg: colors.green, icon: 'check' },
-  failed: {
-    label: '송금 실패',
-    bg: 'rgba(229,72,77,0.1)',
-    fg: colors.red,
-    icon: 'alert-triangle',
-  },
-  reversed: { label: '취소 완료', bg: '#E8EBD8', fg: colors.olive, icon: 'rotate-ccw' },
-  depositCompleted: {
-    label: '입금 완료',
-    bg: 'rgba(184,216,107,0.3)',
-    fg: colors.textDark,
-    icon: 'arrow-down-left',
-  },
-  expenseCompleted: { label: '지출 완료', bg: '#F3F6EA', fg: colors.textDark, icon: 'file-text' },
 };
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────────
@@ -275,95 +244,6 @@ const chipStyles = StyleSheet.create({
   text: {
     fontSize: 12,
     fontWeight: '500',
-  },
-});
-
-function TransactionStatusBadge({ status }) {
-  const c = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
-  return (
-    <View style={[badgeStyles.container, { backgroundColor: c.bg }]}>
-      <Feather name={c.icon} size={10} color={c.fg} />
-      <Text style={[badgeStyles.text, { color: c.fg }]}>{c.label}</Text>
-    </View>
-  );
-}
-
-const badgeStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-  },
-  text: {
-    fontSize: 10,
-    fontWeight: '500',
-  },
-});
-
-function TransactionListItem({ tx, onPress }) {
-  const iconCfg = ICON_MAP[tx.status] ?? ICON_MAP.pending;
-  const positive = tx.amount > 0;
-  const Container = onPress ? TouchableOpacity : View;
-  const containerProps = onPress ? { onPress, activeOpacity: 0.75 } : {};
-
-  return (
-    <Container {...containerProps} style={listStyles.container}>
-      <View style={[listStyles.iconBox, { backgroundColor: iconCfg.bg }]}>
-        <Feather name={iconCfg.name} size={20} color={iconCfg.fg} />
-      </View>
-
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={listStyles.counterparty} numberOfLines={1}>
-          {tx.counterparty}
-        </Text>
-        <Text style={listStyles.meta} numberOfLines={1}>
-          {tx.time} · {tx.description}
-        </Text>
-      </View>
-
-      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={[listStyles.amount, { color: positive ? colors.green : colors.textDark }]}>
-          {positive ? '+' : ''}
-          {tx.amount.toLocaleString()}원
-        </Text>
-        <TransactionStatusBadge status={tx.status} />
-      </View>
-    </Container>
-  );
-}
-
-const listStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  counterparty: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.textDark,
-  },
-  meta: {
-    fontSize: 11,
-    color: 'rgba(111,127,63,0.8)',
-    marginTop: 2,
-  },
-  amount: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });
 

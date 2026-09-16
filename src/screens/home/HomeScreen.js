@@ -58,6 +58,7 @@ export default function HomeScreen({ navigation }) {
             bankName={defaultAccount?.bankName}
             tokenId={defaultAccount?.tokenId}
             balance={defaultAccount?.balance}
+            onPress={() => navigation.navigate(ROUTES.ACCOUNT_DETAIL)}
           />
           <QuickActions
             onTransfer={handleTransferPress}

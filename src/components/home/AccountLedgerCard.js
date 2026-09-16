@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
 
-export default function AccountLedgerCard({ bankName, tokenId, balance }) {
+export default function AccountLedgerCard({ bankName, tokenId, balance, onPress }) {
   return (
-    <View style={styles.card}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>내 자산 원장</Text>
         <View style={styles.badge}>
@@ -42,7 +45,7 @@ export default function AccountLedgerCard({ bankName, tokenId, balance }) {
         <Feather name="lock" size={11} color={colors.textMid} />
         <Text style={styles.noticeText}>계좌번호 대신 안전한 토큰으로 관리돼요.</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -57,6 +60,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
     ...shadows.md,
+  },
+  cardPressed: {
+    opacity: 0.85,
   },
   header: {
     flexDirection: 'row',

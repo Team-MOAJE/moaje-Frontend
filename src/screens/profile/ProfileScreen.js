@@ -25,7 +25,12 @@ const LOGIN_INFO = [
 
 const MENUS = [
   { iconLib: 'Mci', iconName: 'account-edit', label: '내 정보 수정', route: null },
-  { iconLib: 'Mci', iconName: 'bank-outline', label: '연결된 계좌 관리', route: null },
+  {
+    iconLib: 'Mci',
+    iconName: 'bank-outline',
+    label: '연결된 계좌 관리',
+    route: ROUTES.ACCOUNT_DETAIL,
+  },
   { iconLib: 'Mci', iconName: 'fingerprint', label: '생체 인증 설정', route: null },
   { iconLib: 'Feather', iconName: 'bell', label: '알림 설정', route: null },
   {

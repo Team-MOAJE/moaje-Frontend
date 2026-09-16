@@ -6,6 +6,7 @@ export const ROUTES = {
   MAIN_STACK: 'MainStack',
   HOME: 'Home',
   ACCOUNT_LIST: 'AccountList',
+  ACCOUNT_DETAIL: 'AccountDetail',
   DAILY_LIMIT: 'DailyLimit',
   TRANSFER: 'Transfer',
   RECOMMENDATION: 'Recommendation',
