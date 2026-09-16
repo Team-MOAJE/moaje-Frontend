@@ -31,7 +31,7 @@ import TransactionPeriodModal, {
   getPeriodLabel,
 } from './TransactionPeriodModal';
 
-const FILTERS = ['전체', '입금', '출금', '송금', '확인 중', '실패/취소'];
+const FILTERS = ['전체', '입금', '출금', '송금', '실패/취소'];
 
 const getGroup = isoString => {
   if (!isoString) return '이전';
@@ -54,8 +54,6 @@ const matchesFilter = (tx, f) => {
       return tx.status === 'expenseCompleted';
     case '송금':
       return tx.status === 'completed' || tx.status === 'pending';
-    case '확인 중':
-      return tx.status === 'checking';
     case '실패/취소':
       return tx.status === 'failed' || tx.status === 'reversed';
     default:
@@ -97,7 +95,7 @@ const STATUS_CONFIG = {
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────────
 
-function TransactionSummaryCard({ bank, token, current, available, held }) {
+function TransactionSummaryCard({ bank, token, current, available }) {
   return (
     <View style={[summaryStyles.container, shadows.md]}>
       <View style={summaryStyles.accountRow}>
@@ -126,15 +124,7 @@ function TransactionSummaryCard({ bank, token, current, available, held }) {
           <Text style={summaryStyles.gridLabel}>사용 가능 금액</Text>
           <Text style={summaryStyles.gridVal}>{available.toLocaleString()}원</Text>
         </View>
-        <View style={summaryStyles.heldBox}>
-          <Text style={summaryStyles.heldLabel}>확인 중인 송금</Text>
-          <Text style={summaryStyles.gridVal}>{held.toLocaleString()}원</Text>
-        </View>
       </View>
-
-      <Text style={summaryStyles.notice}>
-        확인 중인 거래 금액은 사용 가능 금액에서 잠시 제외돼요.
-      </Text>
     </View>
   );
 }
@@ -190,32 +180,15 @@ const summaryStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  heldBox: {
-    flex: 1,
-    backgroundColor: colors.bgWarn,
-    borderWidth: 1,
-    borderColor: colors.borderWarn,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
   gridLabel: {
     fontSize: 10,
     color: colors.textMid,
-  },
-  heldLabel: {
-    fontSize: 10,
-    color: colors.orange,
   },
   gridVal: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.textDark,
     marginTop: 2,
-  },
-  notice: {
-    fontSize: 11,
-    color: 'rgba(111,127,63,0.8)',
   },
 });
 
@@ -809,7 +782,6 @@ export default function TransactionHistoryScreen({ navigation }) {
         token={defaultAccount?.tokenId ?? '-'}
         current={summary?.currentBalance ?? 0}
         available={summary?.availableBalance ?? 0}
-        held={summary?.heldAmount ?? 0}
       />
 
       {/* 기간 선택 */}
