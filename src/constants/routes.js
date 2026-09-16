@@ -21,6 +21,10 @@ export const ROUTES = {
   ANALYSIS: 'Analysis',
   PIN_INPUT: 'PinInput',
 
+  // 재무 온보딩(My Future)
+  FINANCIAL_ONBOARDING: 'FinancialOnboarding',
+  FINANCIAL_ONBOARDING_RESULT: 'FinancialOnboardingResult',
+
   // 공통 상태 화면
   STATUS_SPLASH_LOADING: 'StatusSplashLoading',
   STATUS_DATA_LOADING: 'StatusDataLoading',

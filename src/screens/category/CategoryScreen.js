@@ -8,6 +8,10 @@ import { colors, radius, shadows } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import CategoryListItem from '../../components/category/CategoryListItem';
 import BottomNavBar from '../../components/home/BottomNavBar';
+import { getOnboardingRepository } from '../../features/onboarding/onboardingRepository';
+
+// 실제 라우트가 아니라 handleItemPress 안에서만 분기하는 sentinel — ROUTES 값과 겹치지 않는다.
+const FINANCIAL_ONBOARDING_ACTION = 'financialOnboardingEntry';
 
 const MENU_ITEMS = [
   {
@@ -46,11 +50,11 @@ const MENU_ITEMS = [
     routeAction: ROUTES.MONEY_RECAP,
   },
   {
-    iconName: 'repeat',
-    title: '구독 관리',
-    desc: '반복 지출 한눈에 보기',
-    variant: 'comingSoon',
-    routeAction: null,
+    iconName: 'flag',
+    title: '재무 온보딩',
+    desc: 'Future Profile로 내 목표 확인하기',
+    variant: 'active',
+    routeAction: FINANCIAL_ONBOARDING_ACTION,
   },
   {
     iconName: 'target',
@@ -89,9 +93,36 @@ export default function CategoryScreen({ navigation }) {
     ]).start(() => setToastVisible(false));
   };
 
+  const handleFinancialOnboardingPress = async () => {
+    const repository = getOnboardingRepository(user?.userId ?? 'guest');
+    const [draft, result] = await Promise.all([repository.loadDraft(), repository.loadResult()]);
+
+    if (draft) {
+      navigation.navigate(ROUTES.FINANCIAL_ONBOARDING, {
+        mode: draft.mode,
+        initialAnswers: draft.answers,
+        initialIndex: draft.currentIndex,
+      });
+      return;
+    }
+    if (result) {
+      navigation.navigate(ROUTES.FINANCIAL_ONBOARDING_RESULT);
+      return;
+    }
+    navigation.navigate(ROUTES.FINANCIAL_ONBOARDING, {
+      mode: 'initial',
+      initialAnswers: {},
+      initialIndex: 0,
+    });
+  };
+
   const handleItemPress = item => {
     if (item.variant === 'comingSoon') {
       showToast();
+      return;
+    }
+    if (item.routeAction === FINANCIAL_ONBOARDING_ACTION) {
+      handleFinancialOnboardingPress();
       return;
     }
     if (item.routeAction) {

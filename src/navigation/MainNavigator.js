@@ -17,6 +17,8 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import TransactionHistoryScreen from '../screens/asset/TransactionHistoryScreen';
 import TransactionDetailScreen from '../screens/asset/TransactionDetailScreen';
 import PinInputScreen from '../screens/auth/PinInputScreen';
+import FinancialOnboardingScreen from '../screens/onboarding/FinancialOnboardingScreen';
+import FinancialOnboardingResultScreen from '../screens/onboarding/FinancialOnboardingResultScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -94,6 +96,16 @@ const MainNavigator = () => (
     <Stack.Screen
       name={ROUTES.TRANSACTION_DETAIL}
       component={TransactionDetailScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.FINANCIAL_ONBOARDING}
+      component={FinancialOnboardingScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.FINANCIAL_ONBOARDING_RESULT}
+      component={FinancialOnboardingResultScreen}
       options={{ headerShown: false }}
     />
     <Stack.Screen
