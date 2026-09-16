@@ -3,6 +3,10 @@ import apiClient from '../../services/apiClient';
 import { API_ENDPOINTS } from '../../constants/apiEndpoints';
 import { normalizeApiError } from '../../utils/normalizeApiError';
 import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
+import {
+  buildTransactionListParams,
+  extractTransactionListResult,
+} from './transactionQueryAdapter';
 
 export const fetchAccounts = createAsyncThunk(
   'asset/fetchAccounts',
@@ -39,11 +43,21 @@ export const fetchAvailableBalance = createAsyncThunk(
 
 export const fetchTransactions = createAsyncThunk(
   'asset/fetchTransactions',
-  async (params = {}, { rejectWithValue }) => {
+  async ({ page = 0, dateRange = null, queryKey = null } = {}, { getState, rejectWithValue }) => {
+    // 요청을 시작하는 시점의 "현재 활성 seq"를 스냅샷으로 고정한다.
+    // resetTransactions/beginTransactionsRefresh는 이 dispatch 직전에 동기적으로
+    // 호출되므로, 이 값은 항상 "이 요청이 속한 라운드"를 정확히 가리킨다.
+    const requestSeq = getState().asset.transactionsActiveQuerySeq;
     try {
-      return await apiClient.get(API_ENDPOINTS.ASSET.TRANSACTIONS, { params });
+      const params = buildTransactionListParams({ page, dateRange });
+      const data = await apiClient.get(API_ENDPOINTS.ASSET.TRANSACTIONS, { params });
+      return { page, queryKey, requestSeq, ...extractTransactionListResult(data) };
     } catch (error) {
-      return rejectWithValue(normalizeApiError(error, '거래내역 조회에 실패했습니다.'));
+      return rejectWithValue({
+        ...normalizeApiError(error, '거래내역 조회에 실패했습니다.'),
+        queryKey,
+        requestSeq,
+      });
     }
   }
 );

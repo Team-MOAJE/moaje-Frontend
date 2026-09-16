@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
+  FlatList,
   Platform,
   Pressable,
   ScrollView,
@@ -20,9 +22,14 @@ import {
   fetchTransactions,
   fetchAccountSummary,
 } from '../../features/asset/assetApi';
+import { resetTransactions, beginTransactionsRefresh } from '../../features/asset/assetSlice';
 import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
 import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
 import { formatDateTime } from '../../utils/formatDate';
+import TransactionPeriodModal, {
+  computePeriodRange,
+  getPeriodLabel,
+} from './TransactionPeriodModal';
 
 const FILTERS = ['전체', '입금', '출금', '송금', '확인 중', '실패/취소'];
 
@@ -593,6 +600,84 @@ const emptyStyles = StyleSheet.create({
   },
 });
 
+function TransactionLoadMoreFooter({ isLoadingMore }) {
+  if (!isLoadingMore) return null;
+  return (
+    <View style={footerStyles.container}>
+      <ActivityIndicator size="small" color={colors.olive} />
+    </View>
+  );
+}
+
+const footerStyles = StyleSheet.create({
+  container: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+});
+
+function TransactionErrorState({ message }) {
+  return (
+    <View style={errorStyles.container}>
+      <Feather name="alert-triangle" size={22} color={colors.red} />
+      <Text style={errorStyles.text}>{message}</Text>
+    </View>
+  );
+}
+
+const errorStyles = StyleSheet.create({
+  container: {
+    borderRadius: radius.xl,
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 24,
+    alignItems: 'center',
+    gap: 8,
+  },
+  text: {
+    fontSize: 13,
+    color: colors.textMid,
+    textAlign: 'center',
+  },
+});
+
+function PeriodSelector({ label, onPress }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [periodStyles.button, pressed && periodStyles.buttonPressed]}
+    >
+      <Feather name="calendar" size={14} color={colors.olive} />
+      <Text style={periodStyles.text}>{label}</Text>
+      <Feather name="chevron-down" size={14} color={colors.textMid} />
+    </Pressable>
+  );
+}
+
+const periodStyles = StyleSheet.create({
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    backgroundColor: colors.cream,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  buttonPressed: {
+    backgroundColor: colors.bgOuter,
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textDark,
+  },
+});
+
 // ── 메인 화면 ─────────────────────────────────────────────────
 
 export default function TransactionHistoryScreen({ navigation }) {
@@ -600,17 +685,48 @@ export default function TransactionHistoryScreen({ navigation }) {
   const transactions = useSelector(state => state.asset.transactions);
   const summary = useSelector(state => state.asset.summary);
   const transactionsLoading = useSelector(state => state.asset.transactionsLoading);
-  const transactionsRefreshing = useSelector(state => state.asset.transactionsRefreshing);
+  const transactionsLoadingMore = useSelector(state => state.asset.transactionsLoadingMore);
+  const transactionsHasMore = useSelector(state => state.asset.transactionsHasMore);
+  const transactionsNextPage = useSelector(state => state.asset.transactionsNextPage);
+  const transactionsError = useSelector(state => state.asset.transactionsError);
   const accounts = useSelector(state => state.asset.accounts);
   const defaultAccount = selectDefaultAccount(accounts);
 
   const [filter, setFilter] = useState('전체');
+  const [periodType, setPeriodType] = useState('전체');
+  const [customStartKey, setCustomStartKey] = useState(null);
+  const [customEndKey, setCustomEndKey] = useState(null);
+  const [periodModalVisible, setPeriodModalVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const dateRange = useMemo(
+    () => computePeriodRange(periodType, customStartKey, customEndKey),
+    [periodType, customStartKey, customEndKey]
+  );
+
+  // dateRange는 매 렌더마다 새 객체이므로 effect deps로 쓰면 안 된다.
+  // 대신 startKey/endKey로 만든 primitive 문자열을 식별자 겸 effect dep으로 쓴다.
+  const transactionQueryKey = useMemo(
+    () => `${dateRange.startKey ?? 'all'}:${dateRange.endKey ?? 'all'}`,
+    [dateRange.startKey, dateRange.endKey]
+  );
+
+  // "어떤 쿼리의 몇 번째 페이지 요청인지"를 식별하는 토큰을 저장한다.
+  // 기간이 바뀐 뒤 뒤늦게 끝나는 이전 기간 loadMore의 .finally()가 새 기간의
+  // guard를 잘못 풀어버리지 않도록, 저장 당시 토큰과 현재 값이 같을 때만 해제한다.
+  const loadMoreTokenRef = useRef(null);
 
   useEffect(() => {
     dispatch(fetchAccounts());
-    dispatch(fetchTransactions());
     dispatch(fetchAccountSummary());
   }, [dispatch]);
+
+  useEffect(() => {
+    loadMoreTokenRef.current = null; // 이전 기간의 in-flight loadMore guard를 강제 해제
+    dispatch(resetTransactions({ queryKey: transactionQueryKey }));
+    dispatch(fetchTransactions({ page: 0, dateRange, queryKey: transactionQueryKey }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transactionQueryKey, dispatch]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -621,10 +737,35 @@ export default function TransactionHistoryScreen({ navigation }) {
   };
 
   const handleRefresh = async () => {
-    if (transactionsRefreshing || transactionsLoading) return;
-    await dispatch(fetchAccounts());
-    await dispatch(fetchTransactions());
-    await dispatch(fetchAccountSummary());
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    // beginTransactionsRefresh()로 seq만 새로 시작 — 새로고침 직전까지 진행 중이던
+    // loadMore가 있었다면 다른 seq를 갖게 되어 나중에 응답이 와도 stale로 무시된다.
+    dispatch(beginTransactionsRefresh());
+    loadMoreTokenRef.current = null;
+    try {
+      await Promise.all([
+        dispatch(fetchAccounts()),
+        dispatch(fetchTransactions({ page: 0, dateRange, queryKey: transactionQueryKey })),
+        dispatch(fetchAccountSummary()),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (transactionsLoading || transactionsLoadingMore || !transactionsHasMore) return;
+    if (loadMoreTokenRef.current) return; // 이미 in-flight 요청 있음
+    const token = `${transactionQueryKey}:${transactionsNextPage}`;
+    loadMoreTokenRef.current = token;
+    dispatch(
+      fetchTransactions({ page: transactionsNextPage, dateRange, queryKey: transactionQueryKey })
+    ).finally(() => {
+      if (loadMoreTokenRef.current === token) {
+        loadMoreTokenRef.current = null;
+      }
+    });
   };
 
   const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
@@ -636,6 +777,12 @@ export default function TransactionHistoryScreen({ navigation }) {
     });
   };
 
+  const handleApplyPeriod = (newPeriodType, startKey, endKey) => {
+    setPeriodType(newPeriodType);
+    setCustomStartKey(startKey);
+    setCustomEndKey(endKey);
+  };
+
   const mappedTxList = transactions.map(tx => ({
     ...tx,
     status: mapTransactionStatus(tx.status),
@@ -645,6 +792,63 @@ export default function TransactionHistoryScreen({ navigation }) {
 
   const filtered = mappedTxList.filter(t => matchesFilter(t, filter));
   const groups = [...new Set(filtered.map(t => t.group))];
+  const listData = groups.map(g => ({
+    group: g,
+    items: filtered.filter(t => t.group === g),
+  }));
+
+  const isInitialLoading = transactionsLoading && transactions.length === 0;
+  const isFilteredEmpty = !isInitialLoading && filtered.length === 0 && !transactionsError;
+  const isNarrowedByFilter = filter !== '전체' || periodType !== '전체';
+
+  const listHeader = (
+    <View style={{ gap: 12, marginBottom: 12 }}>
+      {/* 잔액 요약 카드 */}
+      <TransactionSummaryCard
+        bank={defaultAccount?.bankName ?? '-'}
+        token={defaultAccount?.tokenId ?? '-'}
+        current={summary?.currentBalance ?? 0}
+        available={summary?.availableBalance ?? 0}
+        held={summary?.heldAmount ?? 0}
+      />
+
+      {/* 기간 선택 */}
+      <PeriodSelector
+        label={getPeriodLabel(periodType, customStartKey, customEndKey)}
+        onPress={() => setPeriodModalVisible(true)}
+      />
+
+      {/* 필터 칩 가로 스크롤 */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
+        {FILTERS.map(f => (
+          <TransactionFilterChip
+            key={f}
+            label={f}
+            active={filter === f}
+            onPress={() => setFilter(f)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+
+  const listEmpty = isInitialLoading ? (
+    <TransactionLoadingSkeleton />
+  ) : transactionsError ? (
+    <TransactionErrorState message={transactionsError} />
+  ) : isFilteredEmpty ? (
+    isNarrowedByFilter ? (
+      <View style={styles.emptyFilter}>
+        <Text style={styles.emptyFilterText}>선택한 조건에 거래내역이 없어요.</Text>
+      </View>
+    ) : (
+      <TransactionEmptyState onTransfer={handleTransferPress} />
+    )
+  ) : null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -670,77 +874,54 @@ export default function TransactionHistoryScreen({ navigation }) {
 
         <Text style={styles.headerSub}>최근 자산 흐름과 처리 상태를 확인해보세요.</Text>
 
-        <ScrollView
+        <FlatList
           style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-        >
-          {/* 잔액 요약 카드 */}
-          <TransactionSummaryCard
-            bank={defaultAccount?.bankName ?? '-'}
-            token={defaultAccount?.tokenId ?? '-'}
-            current={summary?.currentBalance ?? 0}
-            available={summary?.availableBalance ?? 0}
-            held={summary?.heldAmount ?? 0}
-          />
-
-          {/* 필터 칩 가로 스크롤 */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}
-          >
-            {FILTERS.map(f => (
-              <TransactionFilterChip
-                key={f}
-                label={f}
-                active={filter === f}
-                onPress={() => setFilter(f)}
-              />
-            ))}
-          </ScrollView>
-
-          {/* 로딩 / 빈 상태 / 거래 목록 */}
-          {transactionsLoading ? (
-            <TransactionLoadingSkeleton />
-          ) : filtered.length === 0 ? (
-            filter !== '전체' ? (
-              <View style={styles.emptyFilter}>
-                <Text style={styles.emptyFilterText}>해당 조건의 거래내역이 없어요.</Text>
-              </View>
-            ) : (
-              <TransactionEmptyState onTransfer={handleTransferPress} />
-            )
-          ) : (
-            <View style={{ gap: 12 }}>
-              {groups.map(g => (
-                <View key={g} style={[styles.groupCard, shadows.sm]}>
-                  <Text style={styles.groupLabel}>{g}</Text>
-                  <View>
-                    {filtered
-                      .filter(t => t.group === g)
-                      .map((t, i, arr) => (
-                        <View key={t.id}>
-                          <TransactionListItem
-                            tx={t}
-                            onPress={
-                              t.status === 'checking' || t.status === 'pending'
-                                ? null
-                                : () => handleTxPress(t)
-                            }
-                          />
-                          {i < arr.length - 1 && <View style={styles.divider} />}
-                        </View>
-                      ))}
+          data={listData}
+          keyExtractor={item => item.group}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          renderItem={({ item }) => (
+            <View style={[styles.groupCard, shadows.sm]}>
+              <Text style={styles.groupLabel}>{item.group}</Text>
+              <View>
+                {item.items.map((t, i, arr) => (
+                  <View key={t.id}>
+                    <TransactionListItem
+                      tx={t}
+                      onPress={
+                        t.status === 'checking' || t.status === 'pending'
+                          ? null
+                          : () => handleTxPress(t)
+                      }
+                    />
+                    {i < arr.length - 1 && <View style={styles.divider} />}
                   </View>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
           )}
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+          ListFooterComponent={
+            <>
+              <TransactionLoadMoreFooter isLoadingMore={transactionsLoadingMore} />
+              <View style={{ height: 40 }} />
+            </>
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+        />
       </View>
+
+      <TransactionPeriodModal
+        visible={periodModalVisible}
+        periodType={periodType}
+        customStartKey={customStartKey}
+        customEndKey={customEndKey}
+        onApply={handleApplyPeriod}
+        onClose={() => setPeriodModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -800,7 +981,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.lg,
-    gap: 12,
     paddingBottom: 32,
   },
   filterRow: {
