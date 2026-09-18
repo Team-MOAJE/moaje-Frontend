@@ -32,7 +32,7 @@ import TransactionPeriodModal, {
 } from './TransactionPeriodModal';
 import TransactionListItem from '../../components/asset/TransactionListItem';
 
-const FILTERS = ['전체', '입금', '출금', '송금', '실패/취소'];
+const FILTERS = ['전체', '입금', '출금', '송금'];
 
 const getGroup = isoString => {
   if (!isoString) return '이전';
@@ -55,8 +55,6 @@ const matchesFilter = (tx, f) => {
       return tx.status === 'expenseCompleted';
     case '송금':
       return tx.status === 'completed' || tx.status === 'pending';
-    case '실패/취소':
-      return tx.status === 'failed' || tx.status === 'reversed';
     default:
       return true;
   }

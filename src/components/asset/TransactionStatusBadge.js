@@ -7,13 +7,6 @@ const STATUS_CONFIG = {
   pending: { label: '처리 중', bg: '#F3F6EA', fg: colors.olive, icon: 'loader' },
   checking: { label: '확인 중', bg: '#FFF8E6', fg: colors.orange, icon: 'clock' },
   completed: { label: '송금 완료', bg: 'rgba(47,158,68,0.1)', fg: colors.green, icon: 'check' },
-  failed: {
-    label: '송금 실패',
-    bg: 'rgba(229,72,77,0.1)',
-    fg: colors.red,
-    icon: 'alert-triangle',
-  },
-  reversed: { label: '취소 완료', bg: '#E8EBD8', fg: colors.olive, icon: 'rotate-ccw' },
   depositCompleted: {
     label: '입금 완료',
     bg: 'rgba(184,216,107,0.3)',

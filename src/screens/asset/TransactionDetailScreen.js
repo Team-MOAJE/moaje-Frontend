@@ -19,14 +19,11 @@ import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
 
 // ── 로컬 색상 (theme에 없는 값) ───────────────────────────────
 const LC = {
-  heroFailedBg: '#FFF0EE',
-  heroFailedBorder: '#FFDAD8',
   heroReversedBg: '#F5F5F0',
   heroReversedBorder: '#E0E0D8',
   timelineLine: '#C8D89A',
   oliveGradStart: '#6F7F3F',
   oliveGradEnd: '#7E9148',
-  failedIcon: '#E5484D',
   reversedIcon: '#6F7F3F',
 };
 
@@ -61,26 +58,6 @@ const STATUS_UI_CONFIG = {
     timelineSteps: ['결제 발생', '잔액 차감', '지출 완료'],
     noticeText: '정상적으로 처리된 거래예요.',
     statusIcon: 'check-circle',
-  },
-  failed: {
-    heroStyle: 'failed',
-    heroLabel: '송금 실패',
-    heroMessage: '송금이 완료되지 않았고, 보류된 금액은 다시 사용할 수 있어요.',
-    typeLabel: '송금',
-    statusLabel: '송금 실패',
-    timelineSteps: ['송금 요청 접수', '처리 중', '금융망 실패 응답', '송금 실패', '보류 금액 해제'],
-    noticeText: '송금이 완료되지 않았고, 보류된 금액은 다시 사용할 수 있어요.',
-    statusIcon: 'alert-triangle',
-  },
-  reversed: {
-    heroStyle: 'reversed',
-    heroLabel: '취소 완료',
-    heroMessage: '확인되지 않은 거래가 취소 처리됐어요.',
-    typeLabel: '송금',
-    statusLabel: '취소 완료',
-    timelineSteps: ['송금 요청 접수', '금융망 응답 없음', '확인 중', '망취소 성공', '취소 완료'],
-    noticeText: '확인되지 않은 거래가 취소 처리됐어요.',
-    statusIcon: 'rotate-ccw',
   },
   pending: {
     heroStyle: 'reversed',
@@ -172,20 +149,13 @@ const headerStyles = StyleSheet.create({
 
 function HeroStatusCard({ uiConfig, detail }) {
   const isOlive = uiConfig.heroStyle === 'olive';
-  const isFailed = uiConfig.heroStyle === 'failed';
 
   const textColor = isOlive ? colors.white : colors.textDark;
-  const iconColor = isFailed ? LC.failedIcon : isOlive ? colors.white : LC.reversedIcon;
+  const iconColor = isOlive ? colors.white : LC.reversedIcon;
 
   const innerBoxStyle = isOlive
     ? { backgroundColor: 'rgba(255,255,255,0.18)' }
-    : isFailed
-      ? {
-          backgroundColor: 'rgba(229,72,77,0.08)',
-          borderColor: LC.heroFailedBorder,
-          borderWidth: 1,
-        }
-      : { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: LC.heroReversedBorder, borderWidth: 1 };
+    : { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: LC.heroReversedBorder, borderWidth: 1 };
 
   const cardContent = (
     <>
@@ -235,9 +205,9 @@ function HeroStatusCard({ uiConfig, detail }) {
       style={[
         heroStyles.card,
         {
-          backgroundColor: isFailed ? LC.heroFailedBg : LC.heroReversedBg,
+          backgroundColor: LC.heroReversedBg,
           borderWidth: 1,
-          borderColor: isFailed ? LC.heroFailedBorder : LC.heroReversedBorder,
+          borderColor: LC.heroReversedBorder,
         },
       ]}
     >

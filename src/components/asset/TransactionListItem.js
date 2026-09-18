@@ -8,8 +8,6 @@ const ICON_MAP = {
   pending: { name: 'clock', bg: '#FFF8E6', fg: colors.orange },
   checking: { name: 'clock', bg: '#FFF8E6', fg: colors.orange },
   completed: { name: 'send', bg: '#F3F6EA', fg: colors.olive },
-  failed: { name: 'alert-triangle', bg: 'rgba(229,72,77,0.1)', fg: colors.red },
-  reversed: { name: 'rotate-ccw', bg: '#E8EBD8', fg: colors.olive },
   depositCompleted: { name: 'arrow-down-left', bg: 'rgba(184,216,107,0.3)', fg: colors.textDark },
   expenseCompleted: { name: 'file-text', bg: '#F3F6EA', fg: colors.olive },
 };
