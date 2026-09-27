@@ -2,11 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
-import { Feather } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import { getOnboardingRepository } from '../../features/onboarding/onboardingRepository';
 import { FINANCIAL_ONBOARDING_QUESTIONS } from '../../constants/financialOnboardingQuestions';
+import { FUTURE_PROFILE_IMAGES } from '../../constants/futureProfileAssets';
+import { buildFinancialOnboardingResultViewModel } from '../../features/onboarding/buildFinancialOnboardingResultViewModel';
+import FutureProfileBackdrop from '../../components/onboarding/FutureProfileBackdrop';
+import FutureProfileHeroCard from '../../components/onboarding/FutureProfileHeroCard';
+import FutureGoalCard from '../../components/onboarding/FutureGoalCard';
+import FirstStepCard from '../../components/onboarding/FirstStepCard';
+import AnswerSummaryList from '../../components/onboarding/AnswerSummaryList';
 
 function optionLabel(answers, questionId) {
   const optionId = answers?.[questionId];
@@ -23,6 +29,7 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
 
   const [answers, setAnswers] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const viewModel = useMemo(() => buildFinancialOnboardingResultViewModel(answers), [answers]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +72,21 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
     );
   }
 
-  const heroLabel = optionLabel(answers, 'q9');
+  const { profile, future, firstStep } = viewModel;
+  const answerSections = [
+    { title: '현재의 나', labels: [optionLabel(answers, 'q1'), optionLabel(answers, 'q3')] },
+    { title: '주거/생활 스타일', labels: [optionLabel(answers, 'q2'), optionLabel(answers, 'q5')] },
+    {
+      title: '돈을 대하는 방식',
+      labels: [optionLabel(answers, 'q4'), optionLabel(answers, 'q6'), optionLabel(answers, 'q7')],
+    },
+    { title: '포기하기 어려운 지출', labels: [optionLabel(answers, 'q8')] },
+    { title: '지금 가장 필요한 도움', labels: [optionLabel(answers, 'q10')] },
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <FutureProfileBackdrop />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -76,64 +94,36 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
       >
         <Text style={styles.title}>나의 Future Profile</Text>
 
-        {heroLabel && (
-          <View style={styles.heroCard}>
-            <View style={styles.heroIconBox}>
-              <Feather name="flag" size={20} color={colors.cream} />
-            </View>
-            <Text style={styles.heroLabel}>3년 뒤 내가 원하는 모습</Text>
-            <Text style={styles.heroValue}>{heroLabel}</Text>
-          </View>
-        )}
+        <FutureProfileHeroCard
+          eyebrow="10개의 답변으로 발견한 나"
+          title={profile.title}
+          description={profile.description}
+          tags={profile.tags}
+          imageSource={FUTURE_PROFILE_IMAGES[profile.imageKey] ?? null}
+          imageKey={profile.imageKey}
+          placeholderIcon={profile.placeholderIcon}
+        />
 
-        <SectionCard title="현재의 나">
-          <SummaryRow label={optionLabel(answers, 'q1')} />
-          <SummaryRow label={optionLabel(answers, 'q3')} />
-        </SectionCard>
+        {future && <FutureGoalCard label={future.label} title={future.title} icon={future.icon} />}
 
-        <SectionCard title="주거/생활 스타일">
-          <SummaryRow label={optionLabel(answers, 'q2')} />
-          <SummaryRow label={optionLabel(answers, 'q5')} />
-        </SectionCard>
+        <Text style={styles.sectionHeading}>미래를 위한 첫걸음</Text>
+        <FirstStepCard
+          badge={firstStep.badge}
+          title={firstStep.title}
+          description={firstStep.description}
+          ctaLabel={firstStep.ctaLabel}
+          icon={firstStep.icon}
+          ctaDisabled
+          ctaHint="목표 만들기는 곧 제공될 예정이에요."
+        />
 
-        <SectionCard title="돈을 대하는 방식">
-          <SummaryRow label={optionLabel(answers, 'q4')} />
-          <SummaryRow label={optionLabel(answers, 'q6')} />
-          <SummaryRow label={optionLabel(answers, 'q7')} />
-        </SectionCard>
-
-        <SectionCard title="포기하기 어려운 지출">
-          <SummaryRow label={optionLabel(answers, 'q8')} />
-        </SectionCard>
-
-        <SectionCard title="지금 가장 필요한 도움">
-          <SummaryRow label={optionLabel(answers, 'q10')} />
-        </SectionCard>
+        <AnswerSummaryList sections={answerSections} />
 
         <Pressable onPress={handleRetake} style={styles.retakeBtn}>
           <Text style={styles.retakeBtnText}>재검사하기</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function SectionCard({ title, children }) {
-  return (
-    <View style={styles.sectionCard}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionBody}>{children}</View>
-    </View>
-  );
-}
-
-function SummaryRow({ label }) {
-  if (!label) return null;
-  return (
-    <View style={styles.summaryRow}>
-      <Feather name="check" size={14} color={colors.olive} />
-      <Text style={styles.summaryLabel}>{label}</Text>
-    </View>
   );
 }
 
@@ -163,59 +153,15 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   title: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
     color: colors.textDark,
+    marginBottom: spacing.xs,
   },
-  heroCard: {
-    borderRadius: radius.xxl,
-    backgroundColor: colors.olive,
-    padding: spacing.xl,
-    gap: spacing.sm,
-    ...shadows.lg,
-  },
-  heroIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.85)',
-  },
-  heroValue: {
-    fontSize: 20,
+  sectionHeading: {
+    marginTop: spacing.sm,
+    fontSize: 18,
     fontWeight: '800',
-    color: colors.cream,
-  },
-  sectionCard: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.bgCard,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textMid,
-  },
-  sectionBody: {
-    gap: spacing.xs,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  summaryLabel: {
-    fontSize: 15,
-    fontWeight: '600',
     color: colors.textDark,
   },
   retakeBtn: {
