@@ -1,8 +1,11 @@
 export const ROUTES = {
   AUTH_STACK: 'AuthStack',
   LOGIN: 'Login',
+  PHONE_LOGIN: 'PhoneLogin',
   SIGNUP: 'Signup',
-  ID_LOGIN: 'IdLogin',
+  SIGNUP_PHONE: 'SignupPhone',
+  SIGNUP_PHONE_VERIFY: 'SignupPhoneVerify',
+  SIGNUP_NAME: 'SignupName',
   MAIN_STACK: 'MainStack',
   HOME: 'Home',
   ACCOUNT_LIST: 'AccountList',

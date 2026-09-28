@@ -18,7 +18,7 @@ const C = {
 };
 
 const LoginScreen = ({ navigation }) => {
-  const handleIdLogin = () => navigation.navigate(ROUTES.ID_LOGIN);
+  const handlePhoneLogin = () => navigation.navigate(ROUTES.PHONE_LOGIN);
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
 
   return (
@@ -58,13 +58,13 @@ const LoginScreen = ({ navigation }) => {
 
         {/* ── 버튼 영역 ─────────────────────────────── */}
         <View style={styles.buttons}>
-          {/* 아이디 로그인 — 올리브 메인 버튼 */}
+          {/* 로그인 — 올리브 메인 버튼 */}
           <TouchableOpacity
-            onPress={handleIdLogin}
+            onPress={handlePhoneLogin}
             activeOpacity={0.85}
             style={[styles.btnIdLogin, styles.shadowMd]}
           >
-            <Text style={styles.btnIdLoginText}>아이디 로그인</Text>
+            <Text style={styles.btnIdLoginText}>로그인</Text>
           </TouchableOpacity>
 
           {/* 회원가입 링크 */}

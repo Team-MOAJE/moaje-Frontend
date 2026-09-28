@@ -52,6 +52,10 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
     });
   };
 
+  const handleGoHome = () => {
+    navigation.reset({ index: 0, routes: [{ name: ROUTES.HOME }] });
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -119,6 +123,10 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
 
         <AnswerSummaryList sections={answerSections} />
 
+        <Pressable onPress={handleGoHome} style={styles.homeBtn}>
+          <Text style={styles.homeBtnText}>홈으로</Text>
+        </Pressable>
+
         <Pressable onPress={handleRetake} style={styles.retakeBtn}>
           <Text style={styles.retakeBtnText}>재검사하기</Text>
         </Pressable>
@@ -164,7 +172,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textDark,
   },
-  retakeBtn: {
+  homeBtn: {
     height: 52,
     borderRadius: radius.lg,
     backgroundColor: colors.olive,
@@ -172,9 +180,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...shadows.sm,
   },
-  retakeBtnText: {
+  homeBtnText: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.cream,
+  },
+  retakeBtn: {
+    height: 52,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retakeBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textDark,
   },
 });

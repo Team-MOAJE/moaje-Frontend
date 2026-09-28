@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   StyleSheet,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,34 +17,24 @@ import { colors, radius, shadows } from '../../theme';
 
 const BG_GRAD = ['#F3F6EA', '#E8F0CF', 'rgba(184,216,107,0.4)'];
 
-const IdLoginScreen = ({ navigation }) => {
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [touched, setTouched] = useState({ userId: false, password: false });
+const validatePhoneNumber = v => /^[0-9]{9,11}$/.test(v);
 
-  const touchField = field => setTouched(t => ({ ...t, [field]: true }));
+const PhoneLoginScreen = ({ navigation }) => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [touched, setTouched] = useState(false);
 
-  const handleUserIdChange = text => setUserId(text);
-
-  const handlePasswordChange = text => setPassword(text);
-
-  const userIdInvalid = touched.userId && userId.trim().length === 0;
-  const passwordInvalid = touched.password && password.length === 0;
-  const allValid = userId.trim().length > 0 && password.length > 0;
+  const handlePhoneNumberChange = text => setPhoneNumber(text.replace(/[^0-9]/g, '').slice(0, 11));
+  const phoneNumberInvalid = touched && phoneNumber.length > 0 && !validatePhoneNumber(phoneNumber);
+  const allValid = validatePhoneNumber(phoneNumber);
 
   const handleBack = () => navigation.popToTop();
 
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
 
-  const handleLogin = () => {
-    if (!allValid) {
-      setTouched({ userId: true, password: true });
-      return;
-    }
-    // API 연결 전 — 실제 dispatch 없음
-    // TODO: 추후 dispatch(loginUser({ userId, password })) 연결
-    Alert.alert('준비 중', '아이디 로그인은 현재 준비 중이에요.');
+  const handleNext = () => {
+    setTouched(true);
+    if (!allValid) return;
+    navigation.navigate(ROUTES.PIN_INPUT, { mode: 'login', phoneNumber });
   };
 
   return (
@@ -55,74 +44,41 @@ const IdLoginScreen = ({ navigation }) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.flex}
         >
-          {/* ── 헤더 ─────────────────────────────── */}
           <View style={styles.header}>
             <TouchableOpacity onPress={handleBack} activeOpacity={0.7} style={styles.backBtn}>
               <Feather name="arrow-left" size={20} color={colors.textDark} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>아이디 로그인</Text>
+            <Text style={styles.headerTitle}>로그인</Text>
           </View>
 
-          {/* ── 스크롤 본문 ─────────────────────── */}
           <ScrollView
             style={styles.flex}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.desc}>가입한 아이디와 비밀번호를 입력해 주세요.</Text>
+            <Text style={styles.desc}>가입한 휴대폰 번호를 입력해 주세요.</Text>
 
-            {/* 폼 카드 */}
             <View style={[styles.card, shadows.md]}>
-              {/* 아이디 */}
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>아이디</Text>
+                <Text style={styles.label}>휴대폰 번호</Text>
                 <TextInput
-                  style={[styles.input, userIdInvalid && styles.inputError]}
-                  value={userId}
-                  onChangeText={handleUserIdChange}
-                  onBlur={() => touchField('userId')}
-                  placeholder="아이디를 입력해 주세요"
+                  style={[styles.input, phoneNumberInvalid && styles.inputError]}
+                  value={phoneNumber}
+                  onChangeText={handlePhoneNumberChange}
+                  onBlur={() => setTouched(true)}
+                  placeholder="휴대폰 번호를 입력해 주세요"
                   placeholderTextColor="rgba(111,127,63,0.4)"
-                  autoCapitalize="none"
-                  autoCorrect={false}
+                  keyboardType="phone-pad"
                 />
-                {userIdInvalid && <Text style={styles.errorText}>아이디를 입력해 주세요.</Text>}
-              </View>
-
-              {/* 비밀번호 */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>비밀번호</Text>
-                <View style={styles.passwordWrap}>
-                  <TextInput
-                    style={[styles.input, styles.inputPw, passwordInvalid && styles.inputError]}
-                    value={password}
-                    onChangeText={handlePasswordChange}
-                    onBlur={() => touchField('password')}
-                    placeholder="비밀번호를 입력해 주세요"
-                    placeholderTextColor="rgba(111,127,63,0.4)"
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(s => !s)}
-                    style={styles.eyeBtn}
-                    activeOpacity={0.6}
-                  >
-                    <Feather
-                      name={showPassword ? 'eye-off' : 'eye'}
-                      size={18}
-                      color="rgba(111,127,63,0.5)"
-                    />
-                  </TouchableOpacity>
-                </View>
-                {passwordInvalid && <Text style={styles.errorText}>비밀번호를 입력해 주세요.</Text>}
+                {phoneNumberInvalid && (
+                  <Text style={styles.errorText}>휴대폰 번호를 올바르게 입력해 주세요.</Text>
+                )}
               </View>
             </View>
 
-            {/* 로그인 버튼 */}
             <TouchableOpacity
-              onPress={handleLogin}
+              onPress={handleNext}
+              disabled={!allValid}
               activeOpacity={allValid ? 0.85 : 1}
               style={[
                 styles.submitBtn,
@@ -135,11 +91,10 @@ const IdLoginScreen = ({ navigation }) => {
                   allValid ? styles.submitTextActive : styles.submitTextDisabled,
                 ]}
               >
-                로그인
+                다음
               </Text>
             </TouchableOpacity>
 
-            {/* 회원가입 링크 */}
             <View style={styles.linkRow}>
               <Text style={styles.linkLabel}>아직 계정이 없으신가요? </Text>
               <TouchableOpacity onPress={handleSignup} activeOpacity={0.5}>
@@ -158,7 +113,6 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
 
-  // 헤더
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -181,7 +135,6 @@ const styles = StyleSheet.create({
     color: colors.textDark,
   },
 
-  // 스크롤 본문
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 48,
@@ -193,7 +146,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
 
-  // 폼 카드
   card: {
     backgroundColor: colors.cream,
     borderRadius: radius.xl,
@@ -205,7 +157,6 @@ const styles = StyleSheet.create({
     gap: 20,
   },
 
-  // 필드 그룹
   fieldGroup: { gap: 6 },
   label: {
     fontSize: 12,
@@ -232,19 +183,6 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // 비밀번호 래퍼
-  passwordWrap: { position: 'relative' },
-  inputPw: { paddingRight: 48 },
-  eyeBtn: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-
-  // 제출 버튼
   submitBtn: {
     marginTop: 20,
     paddingVertical: 14,
@@ -269,7 +207,6 @@ const styles = StyleSheet.create({
   submitTextActive: { color: colors.white },
   submitTextDisabled: { color: 'rgba(111,127,63,0.5)' },
 
-  // 하단 링크
   linkRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -287,4 +224,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default IdLoginScreen;
+export default PhoneLoginScreen;

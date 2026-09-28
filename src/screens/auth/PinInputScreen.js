@@ -1,8 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useDispatch } from 'react-redux';
 import { colors, radius, shadows, spacing } from '../../theme';
+import { API_CODES } from '../../constants/apiCodes';
+import { loginUser, registerUser, verifyUnlockPin } from '../../features/auth/authApi';
+import { unlockApp } from '../../features/auth/authSlice';
+import { getVerificationProof, clearVerificationProof } from '../../features/auth/signupFlowMemory';
 
 const PIN_LENGTH = 6;
 
@@ -16,12 +21,17 @@ function PinDotIndicator({ pinLength }) {
   );
 }
 
-function PinKey({ label, onPress }) {
+function PinKey({ label, onPress, disabled }) {
   const isDel = label === 'del';
   return (
     <Pressable
-      style={({ pressed }) => [styles.key, pressed && styles.keyPressed]}
-      onPress={onPress}
+      style={({ pressed }) => [
+        styles.key,
+        pressed && !disabled && styles.keyPressed,
+        disabled && styles.keyDisabled,
+      ]}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
       accessibilityLabel={isDel ? '지우기' : `${label} 입력`}
     >
       {isDel ? (
@@ -36,7 +46,7 @@ function PinKey({ label, onPress }) {
   );
 }
 
-function PinKeypad({ onPressNum, onPressDel }) {
+function PinKeypad({ onPressNum, onPressDel, disabled }) {
   const ROWS = [
     ['1', '2', '3'],
     ['4', '5', '6'],
@@ -56,6 +66,7 @@ function PinKeypad({ onPressNum, onPressDel }) {
               <PinKey
                 key={`k-${ri}-${ci}`}
                 label={k}
+                disabled={disabled}
                 onPress={() => (k === 'del' ? onPressDel() : onPressNum(k))}
               />
             );
@@ -66,50 +77,193 @@ function PinKeypad({ onPressNum, onPressDel }) {
   );
 }
 
-export default function PinInputScreen({ navigation }) {
+const TITLES = {
+  login: {
+    setup: {
+      title: 'PIN 번호 입력',
+      subtitle: '전화번호와 함께 사용할 PIN 6자리를 입력해 주세요.',
+    },
+  },
+  signup: {
+    setup: {
+      title: 'PIN 설정',
+      subtitle: '앞으로 로그인에 사용할 숫자 6자리 PIN을 설정해 주세요.',
+    },
+    confirm: { title: 'PIN 재입력', subtitle: '다시 한 번 입력해 주세요.' },
+  },
+  unlock: {
+    setup: { title: 'PIN 번호 입력', subtitle: '안전한 이용을 위해 PIN 번호를 입력해 주세요.' },
+  },
+};
+
+export default function PinInputScreen({ navigation, route }) {
+  const dispatch = useDispatch();
+  const { mode, phoneNumber, name, termsRecords } = route.params ?? {};
+
   const [pin, setPin] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'confirm' — signup 모드에서만 의미 있음
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
-  const handlePinComplete = useCallback(() => {
-    // TODO: API Gateway PIN verification will be connected later.
-    setPin([]);
-  }, []);
+  const pendingPinRef = useRef(null);
+
+  const isTwoPhaseMode = mode === 'signup';
+  const copy = TITLES[mode]?.[isTwoPhaseMode ? phase : 'setup'] ?? TITLES.login.setup;
+
+  const resetInput = useCallback(() => setPin([]), []);
+
+  const handleLoginAttempt = useCallback(
+    async enteredPin => {
+      setIsSubmitting(true);
+      try {
+        await dispatch(loginUser({ phoneNumber, pin: enteredPin })).unwrap();
+        // 성공 시 navigate 없음 — authSlice 상태 변화로 RootNavigator가 자동 전환한다.
+      } catch (error) {
+        if (error?.code === API_CODES.AUTH_ACCOUNT_LOCKED) {
+          setIsLocked(true);
+        } else {
+          setErrorMsg('PIN이 올바르지 않아요. 다시 입력해 주세요.');
+        }
+        resetInput();
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [dispatch, phoneNumber, resetInput]
+  );
+
+  const handleTwoPhaseSetupComplete = useCallback(
+    enteredPin => {
+      pendingPinRef.current = enteredPin;
+      setPhase('confirm');
+      resetInput();
+    },
+    [resetInput]
+  );
+
+  const handleTwoPhaseConfirmComplete = useCallback(
+    async enteredPin => {
+      if (enteredPin !== pendingPinRef.current) {
+        setErrorMsg('PIN이 일치하지 않아요. 처음부터 다시 입력해 주세요.');
+        pendingPinRef.current = null;
+        setPhase('setup');
+        resetInput();
+        return;
+      }
+
+      setIsSubmitting(true);
+      setErrorMsg('');
+      const verificationProof = getVerificationProof('signup', phoneNumber);
+      try {
+        await dispatch(
+          registerUser({ phoneNumber, name, pin: enteredPin, verificationProof, termsRecords })
+        ).unwrap();
+        // 성공 시 navigate 없음 — authSlice가 인증 상태 반영, RootNavigator가 자동 전환한다.
+        clearVerificationProof();
+      } catch {
+        setErrorMsg('처리 중 문제가 발생했어요. 다시 시도해 주세요.');
+        setPhase('setup');
+        resetInput();
+      } finally {
+        pendingPinRef.current = null;
+        setIsSubmitting(false);
+      }
+    },
+    [dispatch, phoneNumber, name, termsRecords, resetInput]
+  );
+
+  const handleUnlockAttempt = useCallback(
+    async enteredPin => {
+      setIsSubmitting(true);
+      try {
+        await dispatch(verifyUnlockPin({ pin: enteredPin })).unwrap();
+        dispatch(unlockApp());
+      } catch {
+        setErrorMsg('PIN이 올바르지 않아요. 다시 입력해 주세요.');
+        resetInput();
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [dispatch, resetInput]
+  );
+
+  const handlePinComplete = useCallback(
+    enteredPin => {
+      if (mode === 'login') {
+        handleLoginAttempt(enteredPin);
+      } else if (mode === 'unlock') {
+        handleUnlockAttempt(enteredPin);
+      } else if (isTwoPhaseMode) {
+        if (phase === 'setup') {
+          handleTwoPhaseSetupComplete(enteredPin);
+        } else {
+          handleTwoPhaseConfirmComplete(enteredPin);
+        }
+      }
+    },
+    [
+      mode,
+      phase,
+      isTwoPhaseMode,
+      handleLoginAttempt,
+      handleUnlockAttempt,
+      handleTwoPhaseSetupComplete,
+      handleTwoPhaseConfirmComplete,
+    ]
+  );
 
   const handleNum = useCallback(
     num => {
+      if (isSubmitting || isLocked) return;
       if (pin.length >= PIN_LENGTH) return;
       setErrorMsg('');
       const next = [...pin, num];
       setPin(next);
       if (next.length === PIN_LENGTH) {
-        setTimeout(handlePinComplete, 180);
+        const enteredPin = next.join('');
+        setTimeout(() => handlePinComplete(enteredPin), 180);
       }
     },
-    [pin, handlePinComplete]
+    [pin, isSubmitting, isLocked, handlePinComplete]
   );
 
   const handleDel = useCallback(() => {
+    if (isSubmitting || isLocked) return;
     if (pin.length === 0) return;
     setPin(prev => prev.slice(0, -1));
-  }, [pin]);
+  }, [pin, isSubmitting, isLocked]);
 
   const handleBack = () => {
+    if (mode === 'unlock') return; // 잠금 화면은 뒤로가기로 우회할 수 없다.
+
+    if (isTwoPhaseMode && phase === 'confirm') {
+      pendingPinRef.current = null;
+      setPhase('setup');
+      resetInput();
+      return;
+    }
+
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
-    // TODO: fallback navigation when called from a specific security event
   };
+
+  const keypadDisabled = isSubmitting || isLocked;
 
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
-          onPress={handleBack}
-          accessibilityLabel="뒤로가기"
-        >
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
+        {mode !== 'unlock' && (
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+            onPress={handleBack}
+            accessibilityLabel="뒤로가기"
+          >
+            <Text style={styles.backIcon}>‹</Text>
+          </Pressable>
+        )}
       </View>
 
       <View style={styles.body}>
@@ -118,18 +272,28 @@ export default function PinInputScreen({ navigation }) {
         </View>
 
         <View style={styles.titleGroup}>
-          <Text style={styles.title}>PIN 번호 입력</Text>
-          <Text style={styles.subtitle}>안전한 이용을 위해 PIN 번호를 입력해 주세요.</Text>
+          <Text style={styles.title}>{copy.title}</Text>
+          <Text style={styles.subtitle}>{copy.subtitle}</Text>
         </View>
 
-        <PinDotIndicator pinLength={pin.length} />
+        {!isLocked && <PinDotIndicator pinLength={pin.length} />}
 
-        {errorMsg ? <Text style={styles.errorMsg}>{errorMsg}</Text> : null}
+        {errorMsg && !isLocked ? <Text style={styles.errorMsg}>{errorMsg}</Text> : null}
+
+        {isLocked && (
+          <View style={styles.lockedBox}>
+            <Text style={styles.lockedText}>
+              PIN이 여러 번 잘못 입력되어 잠겼어요. 잠시 후 다시 시도해 주세요.
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.keypadWrapper}>
-        <PinKeypad onPressNum={handleNum} onPressDel={handleDel} />
-      </View>
+      {!isLocked && (
+        <View style={styles.keypadWrapper}>
+          <PinKeypad onPressNum={handleNum} onPressDel={handleDel} disabled={keypadDisabled} />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -143,6 +307,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
+    minHeight: 40 + spacing.md,
   },
   backBtn: {
     width: 40,
@@ -218,9 +383,22 @@ const styles = StyleSheet.create({
     color: colors.red,
     textAlign: 'center',
   },
+  lockedBox: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  lockedText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.red,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   keypadWrapper: {
     paddingHorizontal: spacing.xl,
     paddingBottom: Platform.OS === 'android' ? spacing.xl : spacing.lg,
+    gap: spacing.md,
   },
   keypad: {
     gap: spacing.sm,
@@ -244,6 +422,9 @@ const styles = StyleSheet.create({
   },
   keyPressed: {
     opacity: 0.75,
+  },
+  keyDisabled: {
+    opacity: 0.4,
   },
   keyNum: {
     fontSize: 24,

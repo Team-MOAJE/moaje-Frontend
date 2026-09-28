@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector, useDispatch } from 'react-redux';
-import { restoreSession } from '../features/auth/authApi';
+import { restoreSession, isAppLockFeatureEnabled } from '../features/auth/authApi';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { ROUTES } from '../constants/routes';
@@ -12,6 +12,9 @@ import SplashLoadingScreen from '../screens/status/SplashLoadingScreen';
 import DataLoadingScreen from '../screens/status/DataLoadingScreen';
 import SkeletonLoadingScreen from '../screens/status/SkeletonLoadingScreen';
 import ErrorStateScreen from '../screens/status/ErrorStateScreen';
+
+// ── App Lock (세션 있음 + PIN 잠김) ────────────────────────────
+import PinInputScreen from '../screens/auth/PinInputScreen';
 
 // ── 개발용 미리보기 ────────────────────────────────────────────
 import DevStatePreviewScreen from '../screens/dev/DevStatePreviewScreen';
@@ -39,14 +42,34 @@ const DevPreviewNavigator = () => (
   </DevStack.Navigator>
 );
 
+const LockStack = createNativeStackNavigator();
+
+// 세션(토큰)은 유효하지만 App Lock PIN 잠금 해제가 필요한 상태. PIN_INPUT 화면 1개만 등록한다.
+// isAppLockFeatureEnabled가 false인 동안(현재)은 RootNavigator가 이 트리로 진입시키지 않는다.
+const AppLockStack = () => (
+  <LockStack.Navigator screenOptions={{ headerShown: false }}>
+    <LockStack.Screen
+      name={ROUTES.PIN_INPUT}
+      component={PinInputScreen}
+      initialParams={{ mode: 'unlock' }}
+    />
+  </LockStack.Navigator>
+);
+
 const RootNavigator = () => {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector(state => state.auth.isAuthenticated);
   const isSessionRestored = useSelector(state => state.auth.isSessionRestored);
+  const isAppUnlocked = useSelector(state => state.auth.isAppUnlocked);
 
   useEffect(() => {
     dispatch(restoreSession());
   }, [dispatch]);
+
+  // App Lock: verifyUnlockPin endpoint가 아직 없으면(isAppLockFeatureEnabled=false) 이 분기를
+  // 완전히 건너뛰고 기존 isAuthenticated → MainNavigator 흐름을 그대로 유지한다. endpoint 없이
+  // 강제로 잠그면 세션이 있는 사용자가 PIN을 검증할 방법이 없어 영구히 잠기므로 절대 금지.
+  const needsAppLock = isAuthenticated && isAppLockFeatureEnabled && !isAppUnlocked;
 
   return (
     <NavigationContainer>
@@ -56,10 +79,12 @@ const RootNavigator = () => {
         <MainNavigator />
       ) : !isSessionRestored ? (
         <SplashLoadingScreen />
-      ) : isAuthenticated ? (
-        <MainNavigator />
-      ) : (
+      ) : !isAuthenticated ? (
         <AuthNavigator />
+      ) : needsAppLock ? (
+        <AppLockStack />
+      ) : (
+        <MainNavigator />
       )}
     </NavigationContainer>
   );
