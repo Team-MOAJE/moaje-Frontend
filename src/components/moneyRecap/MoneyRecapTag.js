@@ -1,38 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { moneyRecapColors, moneyRecapRadius } from '../../constants/moneyRecapTheme';
+import { Text, StyleSheet } from 'react-native';
+import { redesign } from '../../theme/redesign';
 
+// pill/배경 없이 텍스트만 쓰는 태그. primary 변형만 올리브로 강조한다.
 export default function MoneyRecapTag({ label, variant = 'default' }) {
-  const isPrimary = variant === 'primary';
-  const isWarning = variant === 'warning';
-  const prefix = isPrimary ? '✦ ' : isWarning ? '⚡ ' : '';
-
-  return (
-    <View style={[styles.tag, isPrimary && styles.primary, isWarning && styles.warning]}>
-      <Text
-        style={[styles.label, isPrimary && styles.labelPrimary, isWarning && styles.labelWarning]}
-      >
-        {prefix}
-        {label}
-      </Text>
-    </View>
-  );
+  return <Text style={[styles.text, variant === 'primary' && styles.primary]}>{label}</Text>;
 }
 
 const styles = StyleSheet.create({
-  tag: {
-    borderRadius: moneyRecapRadius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: moneyRecapColors.tagGreen,
-  },
-  primary: { backgroundColor: moneyRecapColors.primary },
-  warning: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: 1,
-    borderColor: '#FFCC80',
-  },
-  label: { fontSize: 11, fontWeight: '600', color: moneyRecapColors.tagText },
-  labelPrimary: { color: moneyRecapColors.white },
-  labelWarning: { color: '#E65100' },
+  text: { fontSize: 13, color: redesign.textSecondary },
+  primary: { fontWeight: '700', color: redesign.accent },
 });

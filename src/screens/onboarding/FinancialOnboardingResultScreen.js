@@ -11,7 +11,6 @@ import { buildFinancialOnboardingResultViewModel } from '../../features/onboardi
 import FutureProfileBackdrop from '../../components/onboarding/FutureProfileBackdrop';
 import FutureProfileHeroCard from '../../components/onboarding/FutureProfileHeroCard';
 import FutureGoalCard from '../../components/onboarding/FutureGoalCard';
-import FirstStepCard from '../../components/onboarding/FirstStepCard';
 import AnswerSummaryList from '../../components/onboarding/AnswerSummaryList';
 
 function optionLabel(answers, questionId) {
@@ -76,7 +75,7 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
     );
   }
 
-  const { profile, future, firstStep } = viewModel;
+  const { profile, future } = viewModel;
   const answerSections = [
     { title: '현재의 나', labels: [optionLabel(answers, 'q1'), optionLabel(answers, 'q3')] },
     { title: '주거/생활 스타일', labels: [optionLabel(answers, 'q2'), optionLabel(answers, 'q5')] },
@@ -109,17 +108,6 @@ export default function FinancialOnboardingResultScreen({ navigation }) {
         />
 
         {future && <FutureGoalCard label={future.label} title={future.title} icon={future.icon} />}
-
-        <Text style={styles.sectionHeading}>미래를 위한 첫걸음</Text>
-        <FirstStepCard
-          badge={firstStep.badge}
-          title={firstStep.title}
-          description={firstStep.description}
-          ctaLabel={firstStep.ctaLabel}
-          icon={firstStep.icon}
-          ctaDisabled
-          ctaHint="목표 만들기는 곧 제공될 예정이에요."
-        />
 
         <AnswerSummaryList sections={answerSections} />
 
@@ -165,12 +153,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textDark,
     marginBottom: spacing.xs,
-  },
-  sectionHeading: {
-    marginTop: spacing.sm,
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.textDark,
   },
   homeBtn: {
     height: 52,

@@ -1,112 +1,62 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { colors, radius } from '../../theme';
-
-function ComingSoonBadge() {
-  return (
-    <View style={badgeStyles.container}>
-      <Text style={badgeStyles.text}>준비 중</Text>
-    </View>
-  );
-}
-
-const badgeStyles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(255,159,28,0.1)',
-    alignSelf: 'flex-start',
-  },
-  text: {
-    fontSize: 10,
-    color: '#FF9F1C',
-  },
-});
+import { redesign } from '../../theme';
 
 /**
- * @param {string} iconName - Feather 아이콘 이름
+ * Category 메뉴 한 줄. 카드/그림자 없이 divider로만 구분한다.
  * @param {string} title
  * @param {string} description
- * @param {'active'|'comingSoon'|'disabled'} variant
+ * @param {boolean} showDivider - 하단 구분선 표시 여부
  * @param {function} onPress
  */
-export default function CategoryListItem({
-  iconName,
-  title,
-  description,
-  variant = 'active',
-  onPress,
-}) {
-  const dim = variant === 'comingSoon';
-  const disabled = variant === 'disabled';
-
+export default function CategoryListItem({ title, description, showDivider = true, onPress }) {
   return (
-    <TouchableOpacity
-      onPress={disabled ? undefined : onPress}
-      activeOpacity={disabled ? 1 : 0.75}
-      disabled={disabled}
-      style={[styles.container, dim && styles.dimContainer, disabled && styles.disabledContainer]}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
     >
-      <View style={[styles.iconBox, dim && { opacity: 0.55 }]}>
-        <Feather name={iconName} size={20} color={dim ? 'rgba(111,127,63,0.6)' : colors.textMid} />
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={styles.titleRow}>
-          <Text style={[styles.title, dim && { color: 'rgba(52,66,37,0.55)' }]}>{title}</Text>
-          {variant === 'comingSoon' && <ComingSoonBadge />}
+      <View style={[styles.row, showDivider && styles.divider]}>
+        <View style={styles.textWrap}>
+          <Text style={styles.title}>{title}</Text>
+          {!!description && <Text style={styles.desc}>{description}</Text>}
         </View>
-        <Text style={[styles.desc, dim && { color: 'rgba(111,127,63,0.5)' }]}>{description}</Text>
+        <Feather name="chevron-right" size={18} color={redesign.navInactive} />
       </View>
-
-      {variant === 'comingSoon' ? (
-        <Feather name="clock" size={16} color="rgba(111,127,63,0.45)" />
-      ) : (
-        <Feather name="chevron-right" size={16} color="rgba(111,127,63,0.6)" />
-      )}
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: redesign.bg,
+  },
+  pressed: {
+    backgroundColor: redesign.surfaceSoft,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.cream,
+    paddingVertical: 16,
   },
-  dimContainer: {
-    backgroundColor: colors.bgLight,
+  divider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: redesign.divider,
   },
-  disabledContainer: {
-    backgroundColor: colors.cream,
-    opacity: 0.4,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgMain,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
+  textWrap: {
+    flex: 1,
+    marginRight: 12,
   },
   title: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.textDark,
+    color: redesign.textPrimary,
   },
   desc: {
-    fontSize: 12,
-    color: 'rgba(111,127,63,0.8)',
+    fontSize: 13,
+    color: redesign.textSecondary,
+    marginTop: 3,
   },
 });

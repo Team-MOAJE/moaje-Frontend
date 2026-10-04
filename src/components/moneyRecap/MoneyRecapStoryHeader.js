@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { moneyRecapColors } from '../../constants/moneyRecapTheme';
+import { redesign } from '../../theme/redesign';
 
 export default function MoneyRecapStoryHeader({ isDark, onClose }) {
   return (
@@ -10,16 +10,9 @@ export default function MoneyRecapStoryHeader({ isDark, onClose }) {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel="닫기"
-      style={[
-        styles.button,
-        { backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(74,94,42,0.1)' },
-      ]}
+      style={styles.button}
     >
-      <Feather
-        name="x"
-        size={16}
-        color={isDark ? moneyRecapColors.white : moneyRecapColors.primary}
-      />
+      <Feather name="x" size={22} color={isDark ? '#FFFFFF' : redesign.textPrimary} />
     </Pressable>
   );
 }
@@ -28,7 +21,6 @@ const styles = StyleSheet.create({
   button: {
     width: 32,
     height: 32,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

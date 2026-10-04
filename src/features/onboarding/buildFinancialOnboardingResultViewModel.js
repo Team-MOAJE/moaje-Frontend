@@ -1,8 +1,6 @@
 import { FINANCIAL_ONBOARDING_QUESTIONS } from '../../constants/financialOnboardingQuestions';
 import {
-  FALLBACK_FIRST_STEP,
   FALLBACK_PROFILE,
-  FIRST_STEP_BY_Q10,
   FUTURE_CONFIG,
   MAX_PROFILE_TAGS,
   PROFILE_CONFIG,
@@ -20,7 +18,6 @@ export function buildFinancialOnboardingResultViewModel(answers) {
   return {
     profile: buildProfile(safeAnswers),
     future: buildFuture(safeAnswers),
-    firstStep: FIRST_STEP_BY_Q10[safeAnswers.q10] ?? FALLBACK_FIRST_STEP,
   };
 }
 

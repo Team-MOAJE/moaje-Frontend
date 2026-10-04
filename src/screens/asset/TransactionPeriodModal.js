@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
-import { colors, radius, shadows, spacing } from '../../theme';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { formatDateDot } from '../../utils/formatDate';
 
 export const PERIOD_OPTIONS = [
@@ -82,7 +83,7 @@ function PeriodOptionRow({ label, active, onPress }) {
       style={({ pressed }) => [styles.optionRow, pressed && styles.optionRowPressed]}
     >
       <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{label}</Text>
-      {active && <Feather name="check" size={18} color={colors.olive} />}
+      {active && <Feather name="check" size={18} color={redesign.accent} />}
     </Pressable>
   );
 }
@@ -123,7 +124,7 @@ export default function TransactionPeriodModal({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={[styles.sheet, shadows.xl]}>
+        <View style={styles.sheet}>
           <Text style={styles.title}>조회 기간</Text>
 
           {!customMode ? (
@@ -156,7 +157,7 @@ export default function TransactionPeriodModal({
                 <Text style={styles.dateRowLabel}>시작일</Text>
                 <View style={styles.dateFieldValueWrap}>
                   <Text style={styles.dateFieldValue}>{formatDateDot(draftStartKey)}</Text>
-                  <Feather name="chevron-right" size={16} color={colors.textMid} />
+                  <Feather name="chevron-right" size={16} color={redesign.navInactive} />
                 </View>
               </Pressable>
 
@@ -170,7 +171,7 @@ export default function TransactionPeriodModal({
                 <Text style={styles.dateRowLabel}>종료일</Text>
                 <View style={styles.dateFieldValueWrap}>
                   <Text style={styles.dateFieldValue}>{formatDateDot(draftEndKey)}</Text>
-                  <Feather name="chevron-right" size={16} color={colors.textMid} />
+                  <Feather name="chevron-right" size={16} color={redesign.navInactive} />
                 </View>
               </Pressable>
 
@@ -182,7 +183,7 @@ export default function TransactionPeriodModal({
                   display={Platform.OS === 'ios' ? 'inline' : 'default'}
                   locale="ko_KR"
                   themeVariant={Platform.OS === 'ios' ? 'light' : undefined}
-                  accentColor={colors.olive}
+                  accentColor={redesign.accent}
                   positiveButton={{ label: '완료' }}
                   negativeButton={{ label: '취소' }}
                   onValueChange={(_, date) => {
@@ -238,52 +239,49 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: '100%',
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
+    backgroundColor: redesign.bg,
+    borderRadius: 16,
     padding: 24,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: spacing.md,
+    color: redesign.textPrimary,
+    marginBottom: 12,
   },
-  optionList: {
-    gap: 4,
-  },
+  optionList: {},
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
+    minHeight: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
   optionRowPressed: {
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.surfaceSoft,
   },
   optionLabel: {
-    fontSize: 14,
-    color: colors.textDark,
+    fontSize: 15,
+    color: redesign.textPrimary,
   },
   optionLabelActive: {
     fontWeight: '700',
-    color: colors.olive,
+    color: redesign.accent,
   },
   customArea: {
-    gap: spacing.md,
+    gap: 12,
   },
   dateFieldRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: radius.sm,
-    backgroundColor: colors.bgMain,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 14,
+    minHeight: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
   dateFieldRowPressed: {
-    backgroundColor: colors.bgOuter,
+    backgroundColor: redesign.surfaceSoft,
   },
   dateFieldValueWrap: {
     flexDirection: 'row',
@@ -291,14 +289,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   dateFieldValue: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.textDark,
+    color: redesign.textPrimary,
   },
   dateRowLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMid,
+    color: redesign.textSecondary,
   },
   errorText: {
     fontSize: 12,
@@ -307,30 +304,32 @@ const styles = StyleSheet.create({
   modalBtnRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: spacing.sm,
+    marginTop: 8,
   },
   modalBtnCancel: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgMain,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: redesign.surfaceSoft,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBtnCancelText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.textDark,
+    color: redesign.textPrimary,
   },
   modalBtnConfirm: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.olive,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: redesign.accent,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBtnConfirmText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.cream,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

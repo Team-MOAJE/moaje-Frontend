@@ -1,6 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
-  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -10,58 +9,27 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
-import { colors, radius, shadows } from '../../theme';
+import { Feather } from '@expo/vector-icons';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
-import ProfileCard from '../../components/profile/ProfileCard';
 import { logoutUser } from '../../features/auth/authApi';
 
-const LOGIN_INFO = [
-  ['로그인 방식', '아이디 로그인'],
-  ['세션 상태', '로그인 유지 중'],
-  ['생체 인증', '사용 가능'],
-];
-
-const MENUS = [
-  { iconLib: 'Mci', iconName: 'account-edit', label: '내 정보 수정', route: null },
+const MENU_SECTIONS = [
   {
-    iconLib: 'Mci',
-    iconName: 'bank-outline',
-    label: '연결된 계좌 관리',
-    route: ROUTES.ACCOUNT_DETAIL,
+    title: '계정',
+    items: [{ label: '연결된 계좌 관리', route: ROUTES.ACCOUNT_DETAIL }],
   },
-  { iconLib: 'Mci', iconName: 'fingerprint', label: '생체 인증 설정', route: null },
-  { iconLib: 'Feather', iconName: 'bell', label: '알림 설정', route: null },
-  {
-    iconLib: 'Feather',
-    iconName: 'help-circle',
-    label: '고객센터 문의',
-    route: ROUTES.SUPPORT_SCREEN,
-  },
+  { title: '앱', items: [{ label: '알림 설정', route: ROUTES.SETTINGS }] },
 ];
 
 export default function ProfileScreen({ navigation }) {
   const dispatch = useDispatch();
   const user = useSelector(state => state.auth.user);
+  const joined = user?.joinedAt ? `가입 ${user.joinedAt.slice(0, 7).replace('-', '.')}` : null;
+  const school = user?.school ?? null;
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-  const toastTranslateY = useRef(new Animated.Value(8)).current;
-
-  const showToast = () => {
-    setToastVisible(true);
-    toastOpacity.setValue(0);
-    toastTranslateY.setValue(8);
-    Animated.sequence([
-      Animated.parallel([
-        Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(toastTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]),
-      Animated.delay(2100),
-      Animated.timing(toastOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-    ]).start(() => setToastVisible(false));
-  };
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -74,8 +42,6 @@ export default function ProfileScreen({ navigation }) {
   const handleMenuPress = item => {
     if (item.route) {
       navigation.navigate(item.route);
-    } else {
-      showToast();
     }
   };
 
@@ -92,16 +58,12 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.header}>
           <Pressable
             onPress={handleBack}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로가기"
           >
-            <Feather name="arrow-left" size={20} color={colors.textDark} />
-          </Pressable>
-          <Text style={styles.headerTitle}>프로필</Text>
-          <Pressable
-            onPress={showToast}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-          >
-            <Feather name="edit-2" size={18} color={colors.textDark} />
+            <Feather name="arrow-left" size={22} color={redesign.textPrimary} />
           </Pressable>
         </View>
 
@@ -111,63 +73,52 @@ export default function ProfileScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <ProfileCard
-            name={user?.name ?? '-'}
-            userId={user?.userId ?? '-'}
-            school={user?.school ?? '-'}
-            joined={user?.joinedAt ? `가입 ${user.joinedAt.slice(0, 7).replace('-', '.')}` : '-'}
-            initial={user?.name?.charAt(0) ?? '?'}
-          />
+          <Text style={styles.screenTitle}>프로필</Text>
 
-          {/* 로그인 정보 카드 */}
-          <View style={[styles.card, shadows.sm]}>
-            <Text style={styles.sectionLabel}>로그인 정보</Text>
-            {LOGIN_INFO.map(([key, val]) => (
-              <View key={key} style={styles.infoRow}>
-                <Text style={styles.infoKey}>{key}</Text>
-                <Text style={styles.infoVal}>{val}</Text>
-              </View>
-            ))}
+          {/* 사용자 정보 */}
+          <View style={styles.identity}>
+            <View style={styles.accentLine} />
+            <Text style={styles.name}>{user?.name ?? '-'}</Text>
+            <Text style={styles.userId}>{user?.userId ?? '-'}</Text>
+            {(school || joined) && (
+              <Text style={styles.meta}>
+                {school}
+                {school && joined ? ' · ' : ''}
+                {joined}
+              </Text>
+            )}
           </View>
 
-          {/* 메뉴 카드 */}
-          <View style={[styles.card, styles.menuCard, shadows.sm]}>
-            {MENUS.map((item, i) => (
-              <View key={item.label}>
-                <TouchableOpacity
-                  onPress={() => handleMenuPress(item)}
-                  activeOpacity={0.75}
-                  style={styles.menuRow}
-                >
-                  <View style={styles.menuIcon}>
-                    {item.iconLib === 'Mci' ? (
-                      <MaterialCommunityIcons
-                        name={item.iconName}
-                        size={18}
-                        color={colors.textMid}
-                      />
-                    ) : (
-                      <Feather name={item.iconName} size={18} color={colors.textMid} />
-                    )}
-                  </View>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <Feather name="chevron-right" size={16} color={colors.textLight} />
-                </TouchableOpacity>
-                {i < MENUS.length - 1 && <View style={styles.divider} />}
+          {/* 메뉴 */}
+          {MENU_SECTIONS.map(section => (
+            <View key={section.title}>
+              <Text style={styles.sectionLabel}>{section.title}</Text>
+              <View style={styles.menuList}>
+                {section.items.map(item => (
+                  <Pressable
+                    key={item.label}
+                    onPress={() => handleMenuPress(item)}
+                    style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.label}
+                  >
+                    <Text style={styles.menuLabel}>{item.label}</Text>
+                    <Feather name="chevron-right" size={18} color={redesign.navInactive} />
+                  </Pressable>
+                ))}
               </View>
-            ))}
-          </View>
+            </View>
+          ))}
 
-          {/* 로그아웃 버튼 */}
-          <TouchableOpacity
+          {/* 로그아웃 */}
+          <Pressable
             onPress={() => setLogoutModalVisible(true)}
-            activeOpacity={0.75}
-            style={styles.logoutBtn}
+            style={({ pressed }) => [styles.logoutRow, pressed && styles.menuRowPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="로그아웃"
           >
             <Text style={styles.logoutText}>로그아웃</Text>
-          </TouchableOpacity>
-
-          <View style={{ height: 40 }} />
+          </Pressable>
         </ScrollView>
 
         {/* 로그아웃 확인 모달 */}
@@ -178,10 +129,7 @@ export default function ProfileScreen({ navigation }) {
           onRequestClose={() => setLogoutModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, shadows.xl]}>
-              <View style={styles.modalIconWrap}>
-                <Feather name="log-out" size={24} color={colors.red} />
-              </View>
+            <View style={styles.modalSheet}>
               <Text style={styles.modalTitle}>로그아웃할까요?</Text>
               <Text style={styles.modalDesc}>
                 {
@@ -207,22 +155,6 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </Modal>
-
-        {/* Toast */}
-        {toastVisible && (
-          <Animated.View
-            style={[
-              styles.toast,
-              { opacity: toastOpacity, transform: [{ translateY: toastTranslateY }] },
-            ]}
-            pointerEvents="none"
-          >
-            <View style={styles.toastIconWrap}>
-              <MaterialCommunityIcons name="sprout" size={16} color={colors.cream} />
-            </View>
-            <Text style={styles.toastText}>아직 준비 중인 기능이에요 🌱</Text>
-          </Animated.View>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -231,105 +163,97 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: redesign.pagePaddingX,
     paddingTop: 12,
     paddingBottom: 8,
   },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerBtnPressed: {
-    backgroundColor: colors.bgOuter,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textDark,
+  pressedDim: {
+    opacity: 0.6,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    gap: 12,
-    paddingBottom: 32,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
-  card: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
+  screenTitle: {
+    fontSize: 29,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
-  menuCard: {
-    padding: 0,
-    overflow: 'hidden',
+  identity: {
+    marginTop: 12,
+  },
+  accentLine: {
+    width: '100%',
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: redesign.accent,
+    marginBottom: 16,
+  },
+  name: {
+    fontSize: 26,
+    lineHeight: 34,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    color: redesign.textPrimary,
+  },
+  userId: {
+    marginTop: 4,
+    fontSize: 14,
+    color: redesign.textSecondary,
+  },
+  meta: {
+    marginTop: 16,
+    fontSize: 13,
+    color: redesign.textSecondary,
   },
   sectionLabel: {
-    fontSize: 11,
-    color: colors.textMid,
-    marginBottom: 8,
+    marginTop: 44,
+    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    color: redesign.accent,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  infoKey: {
-    fontSize: 14,
-    color: colors.textMid,
-  },
-  infoVal: {
-    fontSize: 14,
-    color: colors.textDark,
+  menuList: {
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: 'space-between',
+    minHeight: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
-  menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-    backgroundColor: colors.bgMain,
-    alignItems: 'center',
-    justifyContent: 'center',
+  menuRowPressed: {
+    backgroundColor: redesign.surfaceSoft,
   },
   menuLabel: {
     flex: 1,
-    fontSize: 14,
-    color: colors.textDark,
+    fontSize: 16,
+    fontWeight: '500',
+    color: redesign.textPrimary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  logoutBtn: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.red,
-    paddingVertical: 14,
-    alignItems: 'center',
+  logoutRow: {
+    marginTop: 48,
+    minHeight: 56,
+    justifyContent: 'center',
   },
   logoutText: {
     fontSize: 15,
@@ -345,94 +269,50 @@ const styles = StyleSheet.create({
   },
   modalSheet: {
     width: '100%',
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
+    backgroundColor: redesign.bg,
+    borderRadius: 16,
     padding: 24,
   },
-  modalIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(229,72,77,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.textDark,
-    textAlign: 'center',
-    marginBottom: 6,
+    color: redesign.textPrimary,
+    marginBottom: 8,
   },
   modalDesc: {
-    fontSize: 13,
-    color: colors.textMid,
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 14,
+    color: redesign.textSecondary,
+    lineHeight: 21,
   },
   modalBtnRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 20,
+    marginTop: 24,
   },
   modalBtnCancel: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: colors.bgMain,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: redesign.surfaceSoft,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBtnCancelText: {
     fontSize: 15,
-    color: colors.textDark,
+    fontWeight: '600',
+    color: redesign.textPrimary,
   },
   modalBtnConfirm: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.md,
+    height: 52,
+    borderRadius: 12,
     backgroundColor: colors.red,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalBtnConfirmText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: colors.white,
-  },
-  toast: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.olive,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    zIndex: 100,
-  },
-  toastIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  toastText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.cream,
-    lineHeight: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

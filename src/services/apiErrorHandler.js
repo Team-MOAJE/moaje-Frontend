@@ -41,20 +41,8 @@ export const handleRequiredAction = (requiredAction, navigation, message) => {
       Alert.alert('서비스 지연', '잠시 후 다시 시도해주세요.\n불편을 드려 죄송합니다.');
       break;
 
+    // 고객센터 기능은 제공하지 않는다 — 서버가 CONTACT_SUPPORT를 내려와도 일반 오류 안내로 처리한다.
     case REQUIRED_ACTIONS.CONTACT_SUPPORT:
-      Alert.alert(
-        '오류',
-        `${displayMessage}\n\n지속적으로 문제가 발생하면 고객센터에 문의해주세요.`,
-        [
-          { text: '취소', style: 'cancel' },
-          {
-            text: '고객센터',
-            onPress: () => navigation?.navigate(ROUTES.SUPPORT_SCREEN),
-          },
-        ]
-      );
-      break;
-
     default:
       Alert.alert('오류', displayMessage);
   }

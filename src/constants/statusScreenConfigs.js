@@ -1,6 +1,6 @@
 import { REQUIRED_ACTIONS } from './requiredActions';
 
-// 5가지 에러 상태 화면의 텍스트·아이콘·칩 config
+// 4가지 에러 상태 화면의 텍스트·아이콘·칩 config
 // ErrorStateScreen에서 requiredAction으로 조회해 사용
 export const STATUS_SCREEN_CONFIGS = {
   [REQUIRED_ACTIONS.RETRY]: {
@@ -38,15 +38,6 @@ export const STATUS_SCREEN_CONFIGS = {
     description: '소중한 자산을 지키기 위해 본인 확인을 한 번 더 진행할게요',
     primaryLabel: '본인 확인하기',
     secondaryLabel: '송금 취소',
-  },
-  [REQUIRED_ACTIONS.CONTACT_SUPPORT]: {
-    layoutTitle: '고객센터 안내',
-    iconName: 'chatbubble-ellipses-outline',
-    chipKey: 'CONTACT_SUPPORT',
-    title: '확인이 필요한 요청이에요',
-    description: '안전한 처리를 위해 고객센터 확인이 필요해요',
-    primaryLabel: '문의하기',
-    secondaryLabel: '홈으로 가기',
   },
 };
 

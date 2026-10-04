@@ -2,8 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Animated, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, radius, shadows } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
 import {
   SettingToggle,
@@ -45,12 +44,13 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.header}>
           <Pressable
             onPress={handleBack}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로가기"
           >
-            <Feather name="arrow-left" size={20} color={colors.textDark} />
+            <Feather name="arrow-left" size={22} color={redesign.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>설정</Text>
-          <View style={{ width: 40 }} />
         </View>
 
         <ScrollView
@@ -58,7 +58,9 @@ export default function SettingsScreen({ navigation }) {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <SectionCard title="알림">
+          <Text style={styles.screenTitle}>설정</Text>
+
+          <Section title="알림" first>
             <SettingToggle label="오늘의 가용금액 알림" defaultOn={true} />
             <SettingDivider />
             <SettingToggle label="지출 위험 알림" defaultOn={false} />
@@ -66,9 +68,9 @@ export default function SettingsScreen({ navigation }) {
             <SettingToggle label="송금 완료 알림" defaultOn={true} />
             <SettingDivider />
             <SettingToggle label="대학 일정 기반 소비 알림" defaultOn={false} />
-          </SectionCard>
+          </Section>
 
-          <SectionCard title="앱 설정">
+          <Section title="앱 설정">
             <SettingValueRow label="테마 설정" value="라이트" onPress={showToast} />
             <SettingDivider />
             <SettingValueRow label="통화 표시" value="KRW (₩)" onPress={showToast} />
@@ -76,7 +78,7 @@ export default function SettingsScreen({ navigation }) {
             <SettingValueRow label="캐시 데이터 새로고침" value="방금 전" onPress={showToast} />
             <SettingDivider />
             <SettingValueRow label="약관 및 개인정보 처리방침" value="보기" onPress={showToast} />
-          </SectionCard>
+          </Section>
         </ScrollView>
 
         {toastVisible && (
@@ -87,9 +89,6 @@ export default function SettingsScreen({ navigation }) {
             ]}
             pointerEvents="none"
           >
-            <View style={styles.toastIconWrap}>
-              <MaterialCommunityIcons name="sprout" size={16} color={colors.cream} />
-            </View>
             <Text style={styles.toastText}>아직 준비 중인 기능이에요 🌱</Text>
           </Animated.View>
         )}
@@ -98,111 +97,82 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-function SectionCard({ title, children }) {
+function Section({ title, first, children }) {
   return (
-    <View style={sectionStyles.card}>
-      <Text style={sectionStyles.title}>{title}</Text>
-      {children}
+    <View>
+      <Text style={[sectionStyles.title, first && sectionStyles.titleFirst]}>{title}</Text>
+      <View style={sectionStyles.list}>{children}</View>
     </View>
   );
 }
 
 const sectionStyles = StyleSheet.create({
-  card: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    ...shadows.sm,
-  },
   title: {
-    fontSize: 11,
-    color: colors.textMid,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    marginTop: 40,
+    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    color: redesign.accent,
+  },
+  titleFirst: {
+    marginTop: 32,
+  },
+  list: {
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
 });
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: redesign.pagePaddingX,
     paddingTop: 12,
     paddingBottom: 8,
+    alignItems: 'flex-start',
   },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.xs,
-  },
-  headerBtnPressed: {
-    backgroundColor: colors.bgOuter,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textDark,
+  pressedDim: {
+    opacity: 0.6,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    gap: 12,
-    paddingBottom: 32,
-    paddingTop: 8,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 16,
+    paddingBottom: 48,
+  },
+  screenTitle: {
+    fontSize: 29,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
   toast: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: redesign.pagePaddingX,
+    right: redesign.pagePaddingX,
     bottom: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.olive,
+    backgroundColor: redesign.accent,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingVertical: 14,
+    borderRadius: 12,
     zIndex: 100,
   },
-  toastIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
   toastText: {
-    flex: 1,
     fontSize: 14,
     fontWeight: '500',
-    color: colors.cream,
+    color: '#FFFFFF',
     lineHeight: 20,
   },
 });

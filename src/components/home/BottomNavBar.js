@@ -1,69 +1,41 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
-import { colors, radius, shadows } from '../../theme';
+import { redesign } from '../../theme';
+import { HomeIcon, TransferIcon, CategoryIcon } from './BottomNavIcons';
 
 const NAV_ITEMS = [
-  { key: 'home', label: '홈', iconName: 'home', handler: 'onHomePress' },
-  { key: 'transfer', label: '송금', iconName: 'send', handler: 'onTransferPress' },
-  { key: 'chart', label: '분석', iconName: 'bar-chart-2', handler: 'onChartPress' },
-  { key: 'grid', label: '카테고리', iconName: 'grid', handler: 'onGridPress' },
+  { key: 'home', label: '홈', Icon: HomeIcon, handler: 'onHomePress' },
+  { key: 'transfer', label: '송금', Icon: TransferIcon, handler: 'onTransferPress' },
+  { key: 'category', label: '카테고리', Icon: CategoryIcon, handler: 'onCategoryPress' },
 ];
 
 export default function BottomNavBar({
   onHomePress,
   onTransferPress,
-  onChartPress,
-  onGridPress,
+  onCategoryPress,
   activeKey = 'home',
 }) {
-  const handlers = { onHomePress, onTransferPress, onChartPress, onGridPress };
+  const handlers = { onHomePress, onTransferPress, onCategoryPress };
 
   return (
     <View style={styles.container}>
-      <View style={styles.bar}>
-        {NAV_ITEMS.map(item => {
-          const onPress = handlers[item.handler];
-          if (item.key === activeKey) {
-            return (
-              <Pressable
-                key={item.key}
-                onPress={onPress}
-                style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
-              >
-                <LinearGradient
-                  colors={[colors.olive, colors.oliveLight]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.activeTab}
-                >
-                  <Feather name={item.iconName} size={18} color={colors.white} />
-                  <Text style={styles.activeLabel}>{item.label}</Text>
-                </LinearGradient>
-              </Pressable>
-            );
-          }
-          return (
-            <Pressable
-              key={item.key}
-              onPress={onPress}
-              style={({ pressed }) => [
-                styles.tabItem,
-                styles.inactiveTab,
-                pressed && styles.inactiveTabPressed,
-              ]}
-            >
-              <Feather
-                name={item.iconName}
-                size={20}
-                color={colors.textMid}
-                style={{ opacity: 0.7 }}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
+      {NAV_ITEMS.map(({ key, label, Icon, handler }) => {
+        const isActive = key === activeKey;
+        const color = isActive ? redesign.accent : redesign.navInactive;
+        return (
+          <Pressable
+            key={key}
+            onPress={handlers[handler]}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{ selected: isActive }}
+            style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}
+          >
+            <Icon size={24} color={color} active={isActive} />
+            <Text style={[styles.label, { color }, isActive && styles.labelActive]}>{label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -74,51 +46,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 0,
-  },
-  bar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.cream,
-    borderRadius: radius.xxxl + 4,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.xl,
+    backgroundColor: redesign.bg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: redesign.divider,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.xxxl,
-    minHeight: 44,
+    gap: 4,
+    minHeight: 48,
   },
   tabItemPressed: {
-    opacity: 0.8,
+    opacity: 0.6,
   },
-  activeTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: radius.xxxl,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    width: '100%',
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  activeLabel: {
-    fontSize: 13,
+  labelActive: {
     fontWeight: '700',
-    color: colors.white,
-  },
-  inactiveTab: {
-    paddingVertical: 10,
-  },
-  inactiveTabPressed: {
-    backgroundColor: colors.bgOuter,
-    borderRadius: radius.xxxl,
   },
 });

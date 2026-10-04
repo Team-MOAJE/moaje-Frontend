@@ -1,44 +1,29 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, Animated, Easing, StyleSheet, AppState } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  STORY_COUNT,
-  STORY_DURATIONS_MS,
-  DARK_STORY_INDEXES,
-} from '../../constants/moneyRecapMockData';
+import { redesign } from '../../theme/redesign';
+import { buildMoneyRecapStories } from '../../features/moneyRecap/buildMoneyRecapStories';
 import MoneyRecapStoryProgress from './MoneyRecapStoryProgress';
 import MoneyRecapStoryHeader from './MoneyRecapStoryHeader';
-import Story1Cover from './stories/Story1Cover';
-import Story2Summary from './stories/Story2Summary';
-import Story3HourlyPattern from './stories/Story3HourlyPattern';
-import Story4CategoryDay from './stories/Story4CategoryDay';
-import Story5AIInsights from './stories/Story5AIInsights';
-import Story6Comparison from './stories/Story6Comparison';
-import Story7Goals from './stories/Story7Goals';
 
 const LEFT_ZONE_RATIO = 0.35;
 const CROSS_FADE_MS = 130;
 const TRANSITION_LOCK_MS = 60;
 const LONG_PRESS_MS = 300;
 
-const STORY_COMPONENTS = [
-  Story1Cover,
-  Story2Summary,
-  Story3HourlyPattern,
-  Story4CategoryDay,
-  Story5AIInsights,
-  Story6Comparison,
-  Story7Goals,
-];
-
-export default function MoneyRecapStories({ onClose }) {
+// 보여줄 story 목록(개수/duration/tone/props)은 전부 buildMoneyRecapStories가 만든 descriptor 배열에서 온다.
+export default function MoneyRecapStories({ onClose, data }) {
   const insets = useSafeAreaInsets();
+  const stories = useMemo(() => buildMoneyRecapStories(data), [data]);
+  const storyCount = stories.length;
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const storiesRef = useRef(stories);
   const currentIndexRef = useRef(0);
   const pausedValueRef = useRef(0);
   const isTransitioningRef = useRef(false);
@@ -46,14 +31,26 @@ export default function MoneyRecapStories({ onClose }) {
   const longPressTimerRef = useRef(null);
   const runningAnimRef = useRef(null);
 
+  storiesRef.current = stories;
+
+  // 현재 index의 duration. story가 없거나 범위를 벗어나면 Infinity(자동 진행 없음)로 취급한다.
+  const getDuration = useCallback(index => storiesRef.current[index]?.duration ?? Infinity, []);
+
   useEffect(() => {
     currentIndexRef.current = currentIndex;
   }, [currentIndex]);
 
+  // stories 개수가 줄어 현재 index가 범위를 벗어나면 마지막 story로 보정한다.
+  useEffect(() => {
+    if (storyCount > 0 && currentIndex > storyCount - 1) {
+      setCurrentIndex(storyCount - 1);
+    }
+  }, [storyCount, currentIndex]);
+
   const navigate = useCallback(
     newIndex => {
       if (isTransitioningRef.current) return;
-      if (newIndex < 0 || newIndex >= STORY_COUNT) return;
+      if (newIndex < 0 || newIndex >= storiesRef.current.length) return;
       isTransitioningRef.current = true;
 
       Animated.timing(fadeAnim, {
@@ -86,7 +83,7 @@ export default function MoneyRecapStories({ onClose }) {
       });
       runningAnimRef.current = anim;
       anim.start(({ finished }) => {
-        if (finished && currentIndexRef.current < STORY_COUNT - 1) {
+        if (finished && currentIndexRef.current < storiesRef.current.length - 1) {
           navigate(currentIndexRef.current + 1);
         }
       });
@@ -97,7 +94,7 @@ export default function MoneyRecapStories({ onClose }) {
   // 스토리 전환 시 진행바를 처음부터 재생(일시정지 중이면 시작하지 않음)
   useEffect(() => {
     if (isPaused) return;
-    const duration = STORY_DURATIONS_MS[currentIndex];
+    const duration = getDuration(currentIndex);
     if (duration === Infinity) {
       progressAnim.setValue(0);
       return undefined;
@@ -115,14 +112,14 @@ export default function MoneyRecapStories({ onClose }) {
           pausedValueRef.current = value;
         });
       } else if (!isPaused) {
-        const duration = STORY_DURATIONS_MS[currentIndexRef.current];
+        const duration = getDuration(currentIndexRef.current);
         if (duration === Infinity) return;
         const remaining = (duration * (100 - pausedValueRef.current)) / 100;
         startSegment(pausedValueRef.current, remaining);
       }
     });
     return () => sub.remove();
-  }, [isPaused, progressAnim, startSegment]);
+  }, [isPaused, progressAnim, startSegment, getDuration]);
 
   const handlePauseStart = useCallback(() => {
     progressAnim.stopAnimation(value => {
@@ -133,11 +130,11 @@ export default function MoneyRecapStories({ onClose }) {
 
   const handleResume = useCallback(() => {
     setIsPaused(false);
-    const duration = STORY_DURATIONS_MS[currentIndexRef.current];
+    const duration = getDuration(currentIndexRef.current);
     if (duration === Infinity) return;
     const remaining = (duration * (100 - pausedValueRef.current)) / 100;
     startSegment(pausedValueRef.current, remaining);
-  }, [startSegment]);
+  }, [startSegment, getDuration]);
 
   const handlePressIn = useCallback(() => {
     isLongPressRef.current = false;
@@ -176,9 +173,24 @@ export default function MoneyRecapStories({ onClose }) {
     []
   );
 
-  const isDark = DARK_STORY_INDEXES.includes(currentIndex);
-  const isLastStory = currentIndex === STORY_COUNT - 1;
-  const CurrentStory = STORY_COMPONENTS[currentIndex];
+  // 보여줄 story가 하나도 없으면(데이터 자체가 없을 때) 빈 화면 대신 간단한 안내 + 닫기만 보여준다.
+  if (storyCount === 0) {
+    return (
+      <View style={[styles.root, styles.emptyRoot]}>
+        <Text style={styles.emptyText}>머니 리캡을 준비하고 있어요</Text>
+        <View style={[styles.closeButtonWrap, { top: insets.top + 40 }]}>
+          <MoneyRecapStoryHeader onClose={onClose} />
+        </View>
+      </View>
+    );
+  }
+
+  const safeIndex = Math.min(currentIndex, storyCount - 1);
+  const currentStory = stories[safeIndex];
+  const CurrentStory = currentStory.component;
+  const isDark = currentStory.tone === 'dark';
+  const storyProps =
+    currentStory.key === 'closing' ? { ...currentStory.props, onClose } : currentStory.props;
 
   return (
     <View style={styles.root}>
@@ -189,14 +201,14 @@ export default function MoneyRecapStories({ onClose }) {
         onPressOut={handlePressOut}
       >
         <Animated.View style={[styles.storyLayer, { opacity: fadeAnim }]}>
-          {isLastStory ? <CurrentStory onClose={onClose} /> : <CurrentStory />}
+          <CurrentStory {...storyProps} />
         </Animated.View>
       </Pressable>
 
       <View style={[styles.progressOverlay, { top: insets.top + 12 }]} pointerEvents="none">
         <MoneyRecapStoryProgress
-          storyCount={STORY_COUNT}
-          currentIndex={currentIndex}
+          storyCount={storyCount}
+          currentIndex={safeIndex}
           progressAnim={progressAnim}
           isDark={isDark}
         />
@@ -207,8 +219,8 @@ export default function MoneyRecapStories({ onClose }) {
       </View>
 
       {isPaused ? (
-        <View style={[styles.pausePill, { bottom: insets.bottom + 56 }]} pointerEvents="none">
-          <Text style={styles.pauseText}>⏸ 일시정지</Text>
+        <View style={[styles.pauseWrap, { bottom: insets.bottom + 56 }]} pointerEvents="none">
+          <Text style={styles.pauseText}>일시정지</Text>
         </View>
       ) : null}
     </View>
@@ -216,20 +228,13 @@ export default function MoneyRecapStories({ onClose }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, overflow: 'hidden', backgroundColor: '#000' },
+  root: { flex: 1, overflow: 'hidden', backgroundColor: redesign.bg },
+  emptyRoot: { alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: 14, color: redesign.textSecondary },
   touchLayer: { flex: 1 },
   storyLayer: { flex: 1 },
   progressOverlay: { position: 'absolute', left: 0, right: 0, zIndex: 50 },
-  closeButtonWrap: { position: 'absolute', left: 16, zIndex: 51 },
-  pausePill: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  pauseText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    overflow: 'hidden',
-  },
+  closeButtonWrap: { position: 'absolute', left: redesign.pagePaddingX - 8, zIndex: 51 },
+  pauseWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  pauseText: { fontSize: 12, fontWeight: '600', color: redesign.textSecondary },
 });

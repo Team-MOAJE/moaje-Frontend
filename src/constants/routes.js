@@ -14,7 +14,6 @@ export const ROUTES = {
   TRANSFER: 'Transfer',
   RECOMMENDATION: 'Recommendation',
   MFA_SCREEN: 'MFAScreen',
-  SUPPORT_SCREEN: 'SupportScreen',
   CATEGORY: 'Category',
   MONEY_RECAP: 'MoneyRecap',
   PROFILE: 'Profile',

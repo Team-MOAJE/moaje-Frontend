@@ -1,83 +1,41 @@
 import React, { useEffect } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSelector, useDispatch } from 'react-redux';
-import { colors, radius, shadows, spacing } from '../../theme';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
 import { fetchTransactionDetail } from '../../features/asset/assetApi';
 import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
 
-// ── 로컬 색상 (theme에 없는 값) ───────────────────────────────
-const LC = {
-  heroReversedBg: '#F5F5F0',
-  heroReversedBorder: '#E0E0D8',
-  timelineLine: '#C8D89A',
-  oliveGradStart: '#6F7F3F',
-  oliveGradEnd: '#7E9148',
-  reversedIcon: '#6F7F3F',
-};
-
 // ── 상태별 UI 설정 (거래별 값 제외) ──────────────────────────────
+// 정상 완료 3종에서는 typeLabel만 화면에 쓴다. pending/checking은 상태 행과 안내 문구를 함께 보여준다.
 const STATUS_UI_CONFIG = {
   completed: {
-    heroStyle: 'olive',
-    heroLabel: '송금 완료',
-    heroMessage: '송금이 정상적으로 완료됐어요.',
     typeLabel: '송금',
     statusLabel: '송금 완료',
-    timelineSteps: ['송금 요청 접수', '처리 중', '금융망 성공 응답', '송금 완료'],
-    noticeText: '정상적으로 처리된 거래예요.',
-    statusIcon: 'check-circle',
+    noticeText: null,
   },
   depositCompleted: {
-    heroStyle: 'olive',
-    heroLabel: '입금 완료',
-    heroMessage: '예정된 알바비가 입금됐어요.',
     typeLabel: '입금',
     statusLabel: '입금 완료',
-    timelineSteps: ['입금 발생', '잔액 반영', '입금 완료'],
-    noticeText: '정상적으로 처리된 거래예요.',
-    statusIcon: 'check-circle',
+    noticeText: null,
   },
   expenseCompleted: {
-    heroStyle: 'olive',
-    heroLabel: '지출 완료',
-    heroMessage: '지출이 정상적으로 처리됐어요.',
-    typeLabel: '지출',
+    typeLabel: '출금',
     statusLabel: '지출 완료',
-    timelineSteps: ['결제 발생', '잔액 차감', '지출 완료'],
-    noticeText: '정상적으로 처리된 거래예요.',
-    statusIcon: 'check-circle',
+    noticeText: null,
   },
   pending: {
-    heroStyle: 'reversed',
-    heroLabel: '처리 중',
-    heroMessage: '송금 요청이 접수됐어요. 잠시 기다려주세요.',
     typeLabel: '송금',
     statusLabel: '처리 중',
-    timelineSteps: ['송금 요청 접수', '처리 중'],
     noticeText: '금융망에서 처리 중이에요. 곧 결과가 반영돼요.',
-    statusIcon: 'loader',
   },
   checking: {
-    heroStyle: 'reversed',
-    heroLabel: '확인 중',
-    heroMessage: '거래 처리 결과를 확인하고 있어요.',
     typeLabel: '송금',
     statusLabel: '확인 중',
-    timelineSteps: ['송금 요청 접수', '처리 중', '금융망 응답 확인 중'],
     noticeText: '시스템에서 거래 결과를 확인하고 있어요. 잠시 후 다시 확인해주세요.',
-    statusIcon: 'clock',
   },
 };
 
@@ -87,188 +45,80 @@ const formatHeroAmount = amount =>
     ? `+${Math.abs(amount).toLocaleString()}원`
     : `-${Math.abs(amount).toLocaleString()}원`;
 
-const formatAbsAmount = amount => `${Math.abs(amount).toLocaleString()}원`;
-
 // ── 서브 컴포넌트 ────────────────────────────────────────────────
 
-function DetailHeader({ onBack }) {
+function ConfirmButton({ onPress, label = '확인' }) {
   return (
-    <View style={headerStyles.container}>
+    <View style={confirmStyles.area}>
       <Pressable
-        onPress={onBack}
-        style={({ pressed }) => [headerStyles.backBtn, pressed && headerStyles.backBtnPressed]}
-        hitSlop={8}
+        onPress={onPress}
+        style={({ pressed }) => [confirmStyles.btn, pressed && confirmStyles.btnPressed]}
+        accessibilityRole="button"
+        accessibilityLabel={label}
       >
-        <Feather name="chevron-left" size={20} color={colors.textDark} />
+        <Text style={confirmStyles.text}>{label}</Text>
       </Pressable>
-      <Text style={headerStyles.title}>거래 상세</Text>
-      <View style={headerStyles.spacer} />
     </View>
   );
 }
 
-const headerStyles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+const confirmStyles = StyleSheet.create({
+  area: {
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: redesign.bg,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
+  btn: {
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: redesign.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.textDark,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-      },
-      android: { elevation: 1 },
-    }),
   },
-  backBtnPressed: {
-    backgroundColor: colors.bgOuter,
+  btnPressed: {
+    opacity: 0.85,
   },
-  title: {
+  text: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textDark,
-  },
-  spacer: {
-    width: 36,
+    color: '#FFFFFF',
   },
 });
 
-function HeroStatusCard({ uiConfig, detail }) {
-  const isOlive = uiConfig.heroStyle === 'olive';
-
-  const textColor = isOlive ? colors.white : colors.textDark;
-  const iconColor = isOlive ? colors.white : LC.reversedIcon;
-
-  const innerBoxStyle = isOlive
-    ? { backgroundColor: 'rgba(255,255,255,0.18)' }
-    : { backgroundColor: 'rgba(0,0,0,0.05)', borderColor: LC.heroReversedBorder, borderWidth: 1 };
-
-  const cardContent = (
-    <>
-      <View style={heroStyles.labelRow}>
-        <Feather name={uiConfig.statusIcon} size={14} color={iconColor} />
-        <Text style={[heroStyles.label, { color: textColor }]}>{uiConfig.heroLabel}</Text>
-      </View>
-      <Text style={[heroStyles.amount, { color: textColor }]}>
-        {formatHeroAmount(detail.amount)}
-      </Text>
-      <Text
-        style={[
-          heroStyles.counterparty,
-          { color: isOlive ? 'rgba(255,255,255,0.85)' : colors.textMid },
-        ]}
-      >
-        {detail.counterparty}
-      </Text>
-      <View style={[heroStyles.messageBox, innerBoxStyle]}>
-        <Text
-          style={[
-            heroStyles.messageText,
-            { color: isOlive ? 'rgba(255,255,255,0.9)' : colors.textMid },
-          ]}
-        >
-          {uiConfig.heroMessage}
-        </Text>
-      </View>
-    </>
-  );
-
-  if (isOlive) {
-    return (
-      <LinearGradient
-        colors={[LC.oliveGradStart, LC.oliveGradEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={heroStyles.card}
-      >
-        {cardContent}
-      </LinearGradient>
-    );
-  }
-
+function TitleBlock({ counterparty, memo }) {
   return (
-    <View
-      style={[
-        heroStyles.card,
-        {
-          backgroundColor: LC.heroReversedBg,
-          borderWidth: 1,
-          borderColor: LC.heroReversedBorder,
-        },
-      ]}
-    >
-      {cardContent}
+    <View style={titleStyles.container}>
+      <Text style={titleStyles.counterparty}>{counterparty}</Text>
+      {!!memo && <Text style={titleStyles.memo}>{memo}</Text>}
     </View>
   );
 }
 
-const heroStyles = StyleSheet.create({
-  card: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    borderRadius: radius.xl,
-    padding: spacing.xl,
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.textDark,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      },
-      android: { elevation: 3 },
-    }),
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  amount: {
-    fontSize: 30,
-    fontWeight: '800',
-    marginBottom: 4,
+const titleStyles = StyleSheet.create({
+  container: {
+    marginTop: 0,
   },
   counterparty: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: spacing.md,
+    fontSize: 29,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
-  messageBox: {
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  messageText: {
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
+  memo: {
+    marginTop: 12,
+    fontSize: 15,
+    lineHeight: 22,
+    color: redesign.textSecondary,
   },
 });
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value, valueColor }) {
   return (
     <View style={infoRowStyles.row}>
       <Text style={infoRowStyles.label}>{label}</Text>
-      <Text style={infoRowStyles.value}>{value}</Text>
+      <Text style={[infoRowStyles.value, valueColor && { color: valueColor }]}>{value}</Text>
     </View>
   );
 }
@@ -277,156 +127,56 @@ const infoRowStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 7,
+    alignItems: 'flex-start',
+    minHeight: 54,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
   label: {
-    fontSize: 13,
-    color: colors.textLight,
-    fontWeight: '500',
+    fontSize: 14,
+    color: redesign.textSecondary,
   },
   value: {
-    fontSize: 13,
-    color: colors.textDark,
+    flex: 1,
+    marginLeft: 16,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '500',
+    color: redesign.textPrimary,
     textAlign: 'right',
-    flexShrink: 1,
-    marginLeft: spacing.md,
   },
 });
 
-function TransactionInfoCard({ rows }) {
+function TransactionInfoList({ rows }) {
   return (
-    <View style={cardStyles.card}>
-      <Text style={cardStyles.cardTitle}>거래 정보</Text>
-      <View style={cardStyles.divider} />
-      {rows.map((row, i) => (
-        <View key={row.label}>
-          <InfoRow label={row.label} value={row.value} />
-          {i < rows.length - 1 && <View style={cardStyles.rowDivider} />}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function TimelineStep({ label, isLast }) {
-  return (
-    <View style={timelineStyles.stepRow}>
-      <View style={timelineStyles.leftCol}>
-        <View style={timelineStyles.circle}>
-          <Feather name="check" size={11} color={colors.white} />
-        </View>
-        {!isLast && <View style={timelineStyles.line} />}
-      </View>
-      <Text style={[timelineStyles.stepLabel, !isLast && timelineStyles.stepLabelSpaced]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-const timelineStyles = StyleSheet.create({
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  leftCol: {
-    alignItems: 'center',
-    width: 22,
-    marginRight: spacing.md,
-  },
-  circle: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.full,
-    backgroundColor: colors.olive,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  line: {
-    width: 2,
-    height: 28,
-    backgroundColor: LC.timelineLine,
-    marginTop: 2,
-  },
-  stepLabel: {
-    fontSize: 13,
-    color: colors.textDark,
-    fontWeight: '500',
-    paddingTop: 3,
-  },
-  stepLabelSpaced: {
-    marginBottom: 0,
-  },
-});
-
-function ProcessingTimelineCard({ steps }) {
-  return (
-    <View style={cardStyles.card}>
-      <Text style={cardStyles.cardTitle}>처리 상태</Text>
-      <View style={cardStyles.divider} />
-      <View style={{ gap: 0 }}>
-        {steps.map((step, i) => (
-          <TimelineStep key={step} label={step} isLast={i === steps.length - 1} />
+    <View>
+      <Text style={listStyles.title}>거래 정보</Text>
+      <View style={listStyles.list}>
+        {rows.map(row => (
+          <InfoRow
+            key={row.label}
+            label={row.label}
+            value={row.value}
+            valueColor={row.valueColor}
+          />
         ))}
       </View>
     </View>
   );
 }
 
-function FriendlyNoticeBox({ text }) {
-  return (
-    <View style={noticeStyles.box}>
-      <Text style={noticeStyles.text}>{text}</Text>
-    </View>
-  );
-}
-
-const noticeStyles = StyleSheet.create({
-  box: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+const listStyles = StyleSheet.create({
+  title: {
+    marginTop: 40,
+    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    color: redesign.accent,
   },
-  text: {
-    fontSize: 12,
-    color: colors.textLight,
-    fontWeight: '500',
-    lineHeight: 17,
-    textAlign: 'center',
-  },
-});
-
-const cardStyles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.xl,
-    ...shadows.sm,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textDark,
-    marginBottom: spacing.md,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  rowDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    opacity: 0.5,
+  list: {
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
   },
 });
 
@@ -449,16 +199,12 @@ export default function TransactionDetailScreen({ route, navigation }) {
   const handleBack = () =>
     navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
 
-  const handleConfirm = () =>
-    navigation.canGoBack() ? navigation.goBack() : navigation.navigate(ROUTES.TRANSACTION_HISTORY);
-
   if (transactionDetailLoading) {
     return (
       <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
         <View style={screenStyles.screen}>
-          <DetailHeader onBack={handleBack} />
           <View style={screenStyles.centerState}>
-            <ActivityIndicator size="large" color={colors.olive} />
+            <ActivityIndicator size="large" color={redesign.accent} />
           </View>
         </View>
       </SafeAreaView>
@@ -469,23 +215,12 @@ export default function TransactionDetailScreen({ route, navigation }) {
     return (
       <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
         <View style={screenStyles.screen}>
-          <DetailHeader onBack={handleBack} />
           <View style={screenStyles.centerState}>
-            <Feather name="alert-circle" size={40} color={colors.textLight} />
+            <Feather name="alert-circle" size={32} color={redesign.navInactive} />
             <Text style={screenStyles.errorText}>거래 상세를 불러오지 못했어요.</Text>
             <Text style={screenStyles.errorSub}>잠시 후 다시 시도해주세요.</Text>
           </View>
-          <View style={screenStyles.bottomArea}>
-            <Pressable
-              onPress={handleBack}
-              style={({ pressed }) => [
-                screenStyles.confirmBtn,
-                pressed && screenStyles.confirmBtnPressed,
-              ]}
-            >
-              <Text style={screenStyles.confirmBtnText}>돌아가기</Text>
-            </Pressable>
-          </View>
+          <ConfirmButton onPress={handleBack} label="돌아가기" />
         </View>
       </SafeAreaView>
     );
@@ -496,50 +231,40 @@ export default function TransactionDetailScreen({ route, navigation }) {
   const uiConfig = STATUS_UI_CONFIG[status];
 
   const detail = {
-    transactionId: transactionDetail.id,
-    status: apiStatus,
     counterparty: transactionDetail.counterparty ?? '-',
     amount: transactionDetail.amount ?? 0,
     requestedAt: transactionDetail.requestedAt ?? '-',
-    memo: transactionDetail.memo ?? '-',
+    memo: transactionDetail.memo ?? '',
   };
 
+  // 상대/메모는 상단 타이틀 영역에서 보여주므로 여기서는 거래 시간·구분·금액(·미완료 상태)만 표시한다.
   const infoRows = [
-    { label: '거래 유형', value: uiConfig.typeLabel },
-    { label: '상대 명', value: detail.counterparty },
-    { label: '금액', value: formatAbsAmount(detail.amount) },
-    { label: '요청 시각', value: detail.requestedAt },
-    { label: '현재 상태', value: uiConfig.statusLabel },
-    { label: '메모', value: detail.memo },
+    { label: '거래 시간', value: detail.requestedAt },
+    { label: '거래 구분', value: uiConfig.typeLabel },
+    {
+      label: '거래 금액',
+      value: formatHeroAmount(detail.amount),
+      valueColor: detail.amount > 0 ? colors.green : redesign.textPrimary,
+    },
   ];
+  if (uiConfig.noticeText) {
+    infoRows.push({ label: '현재 상태', value: uiConfig.statusLabel });
+  }
 
   return (
     <SafeAreaView style={screenStyles.safeArea} edges={['top', 'bottom']}>
       <View style={screenStyles.screen}>
-        <DetailHeader onBack={handleBack} />
-
         <ScrollView
           style={screenStyles.scroll}
           contentContainerStyle={screenStyles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <HeroStatusCard uiConfig={uiConfig} detail={detail} />
-          <TransactionInfoCard rows={infoRows} />
-          <ProcessingTimelineCard steps={uiConfig.timelineSteps} />
-          <FriendlyNoticeBox text={uiConfig.noticeText} />
+          <TitleBlock counterparty={detail.counterparty} memo={detail.memo} />
+          <TransactionInfoList rows={infoRows} />
+          {!!uiConfig.noticeText && <Text style={screenStyles.notice}>{uiConfig.noticeText}</Text>}
         </ScrollView>
 
-        <View style={screenStyles.bottomArea}>
-          <Pressable
-            onPress={handleConfirm}
-            style={({ pressed }) => [
-              screenStyles.confirmBtn,
-              pressed && screenStyles.confirmBtnPressed,
-            ]}
-          >
-            <Text style={screenStyles.confirmBtnText}>확인</Text>
-          </Pressable>
-        </View>
+        <ConfirmButton onPress={handleBack} />
       </View>
     </SafeAreaView>
   );
@@ -548,66 +273,40 @@ export default function TransactionDetailScreen({ route, navigation }) {
 const screenStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 32,
+    paddingBottom: 32,
   },
   centerState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   errorText: {
     fontSize: 15,
     fontWeight: '600',
-    color: colors.textDark,
-    marginTop: spacing.md,
+    color: redesign.textPrimary,
+    marginTop: 8,
   },
   errorSub: {
     fontSize: 13,
-    color: colors.textLight,
+    color: redesign.textSecondary,
   },
-  bottomArea: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bgMain,
-  },
-  confirmBtn: {
-    backgroundColor: colors.olive,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.textDark,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.12,
-        shadowRadius: 8,
-      },
-      android: { elevation: 2 },
-    }),
-  },
-  confirmBtnPressed: {
-    backgroundColor: colors.oliveDark,
-    opacity: 0.92,
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.white,
+  notice: {
+    marginTop: 24,
+    fontSize: 14,
+    lineHeight: 21,
+    color: redesign.textSecondary,
   },
 });

@@ -1,19 +1,14 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { colors, radius, shadows, spacing } from '../../theme';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { formatKRW } from '../../utils/formatMoney';
 import TransactionListItem from './TransactionListItem';
 import AccountSelectorBottomSheet from './AccountSelectorBottomSheet';
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0;
 
 export default function AccountDetailView({
   bankName,
@@ -38,11 +33,16 @@ export default function AccountDetailView({
   onBack,
   onTransferPress,
   onHistoryPress,
-  onViewAllTransactionsPress,
   onTransactionPress,
 }) {
   const [sheetVisible, setSheetVisible] = useState(false);
   const hasAccounts = (accounts?.length ?? 0) > 0;
+  // isAvailableBalanceSupported/availableBalance는 현재 UI에서 렌더하지 않지만,
+  // API가 사용 가능 금액을 지원하게 되면 다시 연결할 수 있도록 prop 구조를 보존한다.
+
+  // 화면 타이틀은 bankName. bankName이 비었을 때만 accountLabel로 대체하고, 둘 다 없으면 '-'.
+  // accountLabel을 별도 줄로 보여주지 않으므로 같은 문구가 반복되지 않는다.
+  const titleText = hasText(bankName) ? bankName : hasText(accountLabel) ? accountLabel : '-';
 
   const renderItem =
     renderRecentTransaction ??
@@ -60,20 +60,25 @@ export default function AccountDetailView({
         <View style={styles.header}>
           <Pressable
             onPress={onBack}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로가기"
           >
-            <Feather name="arrow-left" size={20} color={colors.textDark} />
+            <Feather name="arrow-left" size={22} color={redesign.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>내 계좌</Text>
           <Pressable
             onPress={onRefresh}
             disabled={isRefreshing}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="새로고침"
           >
             {isRefreshing ? (
-              <ActivityIndicator size="small" color={colors.textDark} />
+              <ActivityIndicator size="small" color={redesign.accent} />
             ) : (
-              <Feather name="refresh-cw" size={18} color={colors.textDark} />
+              <Feather name="refresh-cw" size={20} color={redesign.accent} />
             )}
           </Pressable>
         </View>
@@ -96,71 +101,69 @@ export default function AccountDetailView({
                 styles.identitySection,
                 pressed && styles.identitySectionPressed,
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="계좌 선택"
             >
-              <Text style={styles.bankName}>{bankName ?? '-'}</Text>
-              <Text style={styles.accountLabel}>{accountLabel ?? bankName ?? '-'}</Text>
+              <Text style={styles.accountTitle}>{titleText}</Text>
               {maskedAccountNumber ? (
                 <View style={styles.maskedRow}>
                   <Text style={styles.maskedNumber}>{maskedAccountNumber}</Text>
-                  <Feather name="chevron-down" size={16} color={colors.textLight} />
+                  <Feather name="chevron-down" size={16} color={redesign.navInactive} />
                 </View>
               ) : null}
             </Pressable>
 
             {refreshError ? (
-              <View style={styles.refreshErrorBanner}>
-                <Feather name="alert-circle" size={12} color={colors.red} />
+              <View style={styles.refreshErrorRow}>
+                <Feather name="alert-circle" size={13} color={colors.red} />
                 <Text style={styles.refreshErrorText}>{refreshError}</Text>
               </View>
             ) : null}
 
-            <View style={styles.balanceCard}>
+            <View style={styles.balanceSection}>
               <Text style={styles.balanceLabel}>현재 잔액</Text>
-              <Text style={styles.balanceAmount}>{formatKRW(currentBalance)}</Text>
-
-              <View style={styles.availableRow}>
-                <Text style={styles.availableLabel}>사용 가능 금액</Text>
-                {isAvailableBalanceSupported ? (
-                  <Text style={styles.availableValue}>{formatKRW(availableBalance)}</Text>
-                ) : (
-                  <Text style={styles.availableUnsupported}>제공되지 않아요</Text>
-                )}
-              </View>
-
-              <Text style={styles.balanceNotice}>
-                {isAvailableBalanceSupported
-                  ? '처리 중인 거래가 있으면 사용 가능 금액이 달라질 수 있어요.'
-                  : '사용 가능 금액은 아직 제공되지 않는 정보예요.'}
+              <Text
+                style={styles.balanceAmount}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                numberOfLines={1}
+              >
+                {formatKRW(currentBalance)}
               </Text>
             </View>
 
             <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.transferBtn]}
+              <Pressable
                 onPress={onTransferPress}
-                activeOpacity={0.85}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  styles.transferBtn,
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="송금하기"
               >
-                <Feather name="send" size={16} color={colors.white} />
                 <Text style={styles.transferBtnText}>송금하기</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.historyBtn]}
+              </Pressable>
+              <Pressable
                 onPress={onHistoryPress}
-                activeOpacity={0.75}
+                style={({ pressed }) => [
+                  styles.actionBtn,
+                  styles.historyBtn,
+                  pressed && styles.btnPressed,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="거래내역"
               >
-                <Feather name="file-text" size={16} color={colors.textDark} />
                 <Text style={styles.historyBtnText}>거래내역</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <View style={styles.recentHeader}>
               <Text style={styles.recentTitle}>최근 거래</Text>
-              <TouchableOpacity onPress={onViewAllTransactionsPress} hitSlop={8}>
-                <Text style={styles.recentViewAll}>전체보기 〉</Text>
-              </TouchableOpacity>
             </View>
 
-            <View style={styles.recentCard}>
+            <View style={styles.recentList}>
               {!isRecentTransactionsSupported ? (
                 <View style={styles.recentUnsupported}>
                   <Text style={styles.recentUnsupportedText}>
@@ -169,9 +172,12 @@ export default function AccountDetailView({
                   <Text style={styles.recentUnsupportedSubText}>
                     거래내역 화면에서 전체 내역을 확인해보세요.
                   </Text>
-                  <TouchableOpacity onPress={onHistoryPress}>
+                  <Pressable
+                    onPress={onHistoryPress}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Text style={styles.recentUnsupportedLink}>거래내역 보기</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </View>
               ) : (recentTransactions?.length ?? 0) === 0 ? (
                 <Text style={styles.recentEmptyText}>최근 거래 내역이 없어요.</Text>
@@ -208,14 +214,11 @@ function AccountDetailSkeleton() {
   return (
     <View style={styles.stateContainer}>
       <View style={[styles.skeletonBar, { width: 80, height: 12 }]} />
-      <View style={[styles.skeletonBar, { width: 140, height: 18, marginTop: spacing.sm }]} />
-      <View style={[styles.skeletonBar, { width: 120, height: 12, marginTop: spacing.sm }]} />
-      <View style={[styles.skeletonBlock, { marginTop: spacing.xl }]} />
-      <View style={styles.skeletonRow}>
-        <View style={[styles.skeletonBar, { flex: 1, height: 48, borderRadius: radius.lg }]} />
-        <View style={[styles.skeletonBar, { flex: 1, height: 48, borderRadius: radius.lg }]} />
-      </View>
-      <View style={[styles.skeletonBlock, { marginTop: spacing.xl, height: 160 }]} />
+      <View style={[styles.skeletonBar, { width: 180, height: 28, marginTop: 12 }]} />
+      <View style={[styles.skeletonBar, { width: 120, height: 12, marginTop: 12 }]} />
+      <View style={[styles.skeletonBar, { width: 200, height: 34, marginTop: 40 }]} />
+      <View style={[styles.skeletonBar, { height: 56, borderRadius: 12, marginTop: 32 }]} />
+      <View style={[styles.skeletonBar, { height: 120, marginTop: 40 }]} />
     </View>
   );
 }
@@ -223,14 +226,15 @@ function AccountDetailSkeleton() {
 function AccountDetailErrorState({ message, onRetry }) {
   return (
     <View style={styles.stateContainer}>
-      <View style={styles.stateCard}>
-        <Feather name="alert-triangle" size={28} color={colors.red} />
-        <Text style={styles.stateTitle}>계좌 정보를 불러오지 못했어요.</Text>
-        {message ? <Text style={styles.stateMessage}>{message}</Text> : null}
-        <TouchableOpacity style={styles.stateRetryBtn} onPress={onRetry}>
-          <Text style={styles.stateRetryText}>다시 시도</Text>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.stateTitle}>계좌 정보를 불러오지 못했어요.</Text>
+      {message ? <Text style={styles.stateMessage}>{message}</Text> : null}
+      <Pressable
+        style={({ pressed }) => [styles.stateRetryBtn, pressed && styles.btnPressed]}
+        onPress={onRetry}
+        accessibilityRole="button"
+      >
+        <Text style={styles.stateRetryText}>다시 시도</Text>
+      </Pressable>
     </View>
   );
 }
@@ -238,10 +242,7 @@ function AccountDetailErrorState({ message, onRetry }) {
 function AccountDetailEmptyState() {
   return (
     <View style={styles.stateContainer}>
-      <View style={styles.stateCard}>
-        <Feather name="credit-card" size={28} color={colors.textLight} />
-        <Text style={styles.stateTitle}>아직 연결된 계좌가 없어요.</Text>
-      </View>
+      <Text style={styles.stateTitle}>아직 연결된 계좌가 없어요.</Text>
     </View>
   );
 }
@@ -249,280 +250,189 @@ function AccountDetailEmptyState() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.xs,
-  },
-  headerBtnPressed: {
-    backgroundColor: colors.bgOuter,
-    opacity: 0.8,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.textDark,
+  pressedDim: {
+    opacity: 0.6,
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.md,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
   identitySection: {
-    gap: 2,
+    gap: 4,
     alignSelf: 'flex-start',
   },
   identitySectionPressed: {
     opacity: 0.7,
   },
-  bankName: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textLight,
-  },
-  accountLabel: {
-    fontSize: 17,
+  accountTitle: {
+    fontSize: 29,
+    lineHeight: 38,
     fontWeight: '800',
-    color: colors.textDark,
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
   maskedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 2,
   },
   maskedNumber: {
     fontSize: 13,
-    fontWeight: '500',
-    color: colors.textLight,
+    color: redesign.textSecondary,
     fontFamily: 'monospace',
   },
-  refreshErrorBanner: {
+  refreshErrorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: 'rgba(229,72,77,0.08)',
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    gap: 6,
+    marginTop: 16,
   },
   refreshErrorText: {
     fontSize: 12,
-    fontWeight: '500',
     color: colors.red,
     flex: 1,
   },
-  balanceCard: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-    ...shadows.md,
+  balanceSection: {
+    marginTop: 36,
   },
   balanceLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMid,
+    fontSize: 13,
+    color: redesign.textSecondary,
   },
   balanceAmount: {
-    fontSize: 28,
+    marginTop: 4,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: '800',
-    color: colors.textDark,
-  },
-  availableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
-  availableLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textMid,
-  },
-  availableValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textDark,
-  },
-  availableUnsupported: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.textLight,
-  },
-  balanceNotice: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textLight,
-    marginTop: spacing.xs,
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 12,
+    marginTop: 32,
   },
   actionBtn: {
     flex: 1,
-    flexDirection: 'row',
+    height: 54,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
   },
   transferBtn: {
-    backgroundColor: colors.oliveDark,
+    backgroundColor: redesign.accent,
+  },
+  btnPressed: {
+    opacity: 0.85,
   },
   transferBtnText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.white,
+    color: '#FFFFFF',
   },
   historyBtn: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: redesign.accent,
   },
   historyBtnText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: colors.textDark,
+    color: '#FFFFFF',
   },
   recentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.sm,
+    marginTop: 40,
+    marginBottom: 4,
   },
   recentTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.textDark,
-  },
-  recentViewAll: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.textLight,
+    color: redesign.accent,
   },
-  recentCard: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.sm,
+  recentList: {
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
   },
   recentDivider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginLeft: spacing.lg + 40 + spacing.md,
+    backgroundColor: redesign.divider,
   },
   recentEmptyText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textLight,
-    textAlign: 'center',
-    paddingVertical: spacing.xl,
+    fontSize: 14,
+    color: redesign.textSecondary,
+    paddingVertical: 24,
   },
   recentUnsupported: {
-    alignItems: 'center',
     gap: 4,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: 24,
   },
   recentUnsupportedText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.textMid,
-    textAlign: 'center',
+    color: redesign.textPrimary,
   },
   recentUnsupportedSubText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.textLight,
-    textAlign: 'center',
+    fontSize: 13,
+    color: redesign.textSecondary,
   },
   recentUnsupportedLink: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: colors.oliveDark,
-    marginTop: spacing.xs,
+    color: redesign.accent,
+    marginTop: 8,
   },
   stateContainer: {
     flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-  },
-  stateCard: {
-    backgroundColor: colors.cream,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.xxl,
-    alignItems: 'center',
-    gap: spacing.sm,
-    ...shadows.sm,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 32,
   },
   stateTitle: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.textDark,
-    textAlign: 'center',
+    color: redesign.textPrimary,
   },
   stateMessage: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.textLight,
-    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+    color: redesign.textSecondary,
+    marginTop: 8,
   },
   stateRetryBtn: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.oliveDark,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
+    marginTop: 24,
+    alignSelf: 'flex-start',
+    height: 48,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    backgroundColor: redesign.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stateRetryText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: colors.white,
+    color: '#FFFFFF',
   },
   skeletonBar: {
-    backgroundColor: colors.bgOuter,
-    borderRadius: radius.xs,
-  },
-  skeletonBlock: {
-    backgroundColor: colors.bgOuter,
-    borderRadius: radius.xl,
-    height: 120,
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    backgroundColor: redesign.divider,
+    borderRadius: 4,
   },
 });

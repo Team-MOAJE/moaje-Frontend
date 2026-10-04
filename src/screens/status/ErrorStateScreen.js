@@ -28,9 +28,6 @@ const ErrorStateScreen = ({ navigation, route }) => {
         case REQUIRED_ACTIONS.MFA_AUTH:
           navigation.navigate(ROUTES.MFA_SCREEN);
           break;
-        case REQUIRED_ACTIONS.CONTACT_SUPPORT:
-          navigation.navigate(ROUTES.SUPPORT_SCREEN);
-          break;
         default:
           if (navigation.canGoBack()) navigation.goBack();
           break;

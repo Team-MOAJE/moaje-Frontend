@@ -3,7 +3,8 @@ import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useDispatch } from 'react-redux';
-import { colors, radius, shadows, spacing } from '../../theme';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { API_CODES } from '../../constants/apiCodes';
 import { loginUser, registerUser, verifyUnlockPin } from '../../features/auth/authApi';
 import { unlockApp } from '../../features/auth/authSlice';
@@ -35,10 +36,7 @@ function PinKey({ label, onPress, disabled }) {
       accessibilityLabel={isDel ? '지우기' : `${label} 입력`}
     >
       {isDel ? (
-        <View style={styles.delInner}>
-          <Text style={styles.delIcon}>⌫</Text>
-          <Text style={styles.delText}>지우기</Text>
-        </View>
+        <Ionicons name="backspace-outline" size={26} color={redesign.textSecondary} />
       ) : (
         <Text style={styles.keyNum}>{label}</Text>
       )}
@@ -257,28 +255,28 @@ export default function PinInputScreen({ navigation, route }) {
       <View style={styles.header}>
         {mode !== 'unlock' && (
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
             onPress={handleBack}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.backBtnPressed}
             accessibilityLabel="뒤로가기"
           >
-            <Text style={styles.backIcon}>‹</Text>
+            <Ionicons name="arrow-back" size={22} color={redesign.textPrimary} />
           </Pressable>
         )}
       </View>
 
       <View style={styles.body}>
-        <View style={styles.iconBox}>
-          <Ionicons name="lock-closed" size={30} color={colors.white} />
-        </View>
+        <Text style={styles.title}>{copy.title}</Text>
+        <Text style={styles.subtitle}>{copy.subtitle}</Text>
 
-        <View style={styles.titleGroup}>
-          <Text style={styles.title}>{copy.title}</Text>
-          <Text style={styles.subtitle}>{copy.subtitle}</Text>
-        </View>
-
-        {!isLocked && <PinDotIndicator pinLength={pin.length} />}
-
-        {errorMsg && !isLocked ? <Text style={styles.errorMsg}>{errorMsg}</Text> : null}
+        {!isLocked && (
+          <View style={styles.indicatorArea}>
+            <PinDotIndicator pinLength={pin.length} />
+            <View style={styles.errorSlot}>
+              {errorMsg ? <Text style={styles.errorMsg}>{errorMsg}</Text> : null}
+            </View>
+          </View>
+        )}
 
         {isLocked && (
           <View style={styles.lockedBox}>
@@ -301,148 +299,113 @@ export default function PinInputScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   header: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    minHeight: 40 + spacing.md,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    backgroundColor: colors.bgCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.sm,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 12,
+    paddingBottom: 8,
+    minHeight: 22 + 12 + 8,
+    alignItems: 'flex-start',
   },
   backBtnPressed: {
-    opacity: 0.7,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: colors.textDark,
-    lineHeight: 28,
-    marginTop: -2,
+    opacity: 0.6,
   },
   body: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.xl,
-  },
-  iconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.xl,
-    backgroundColor: colors.oliveDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-  },
-  titleGroup: {
-    alignItems: 'center',
-    gap: spacing.sm,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 24,
   },
   title: {
-    fontSize: 20,
+    fontSize: 29,
+    lineHeight: 38,
     fontWeight: '800',
-    color: colors.textDark,
-    letterSpacing: -0.3,
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
   subtitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textLight,
-    textAlign: 'center',
-    lineHeight: 20,
+    marginTop: 12,
+    fontSize: 14,
+    lineHeight: 21,
+    color: redesign.textSecondary,
+  },
+  indicatorArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dotsRow: {
     flexDirection: 'row',
-    gap: spacing.lg,
+    justifyContent: 'center',
+    gap: 18,
   },
   dot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
   },
   dotEmpty: {
-    borderWidth: 2,
-    borderColor: colors.olive,
+    borderColor: redesign.navInactive,
     backgroundColor: 'transparent',
   },
   dotFilled: {
-    backgroundColor: colors.olive,
+    borderColor: redesign.accent,
+    backgroundColor: redesign.accent,
+  },
+  errorSlot: {
+    alignSelf: 'stretch',
+    minHeight: 40,
+    marginTop: 16,
   },
   errorMsg: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.red,
     textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.red,
   },
   lockedBox: {
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
+    marginTop: 32,
+    gap: 16,
+    alignItems: 'flex-start',
   },
   lockedText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: colors.red,
-    textAlign: 'center',
     lineHeight: 20,
+    color: colors.red,
   },
   keypadWrapper: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: Platform.OS === 'android' ? spacing.xl : spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: redesign.pagePaddingX - 8,
+    paddingBottom: Platform.OS === 'android' ? 24 : 16,
   },
   keypad: {
-    gap: spacing.sm,
+    gap: 4,
   },
   keyRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 4,
   },
   keyEmpty: {
     flex: 1,
-    height: 64,
+    height: 60,
   },
   key: {
     flex: 1,
-    height: 64,
-    borderRadius: radius.lg,
-    backgroundColor: colors.bgCard,
+    height: 60,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.sm,
   },
   keyPressed: {
-    opacity: 0.75,
+    backgroundColor: redesign.surfaceSoft,
   },
   keyDisabled: {
     opacity: 0.4,
   },
   keyNum: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: colors.textDark,
-  },
-  delInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  delIcon: {
-    fontSize: 20,
-    color: colors.textDark,
-  },
-  delText: {
-    fontSize: 10,
+    fontSize: 28,
     fontWeight: '500',
-    color: colors.textMid,
-    marginTop: 1,
+    color: redesign.textPrimary,
   },
 });

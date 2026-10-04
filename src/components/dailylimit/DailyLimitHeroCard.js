@@ -1,228 +1,94 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
-import { colors, radius, shadows } from '../../theme';
+import { redesign } from '../../theme';
 
-const formatCurrency = amount => `${Number(amount).toLocaleString()}원`;
+const formatNumber = amount => Number(amount).toLocaleString('ko-KR');
+const formatCurrency = amount => `${formatNumber(amount)}원`;
 
-const RING_R = 52;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_R;
-
-export default function DailyLimitHeroCard({ amount = 18500, spent = 6200, daysLeft = 7 }) {
+// 핵심 금액 + 오늘 사용 현황. Home의 안전 금액 영역과 같은 시각 언어를 쓴다.
+export default function DailyLimitHeroCard({ amount, spent, daysLeft }) {
   const remaining = Math.max(amount - spent, 0);
-  const pct = amount > 0 ? Math.min(spent / amount, 1) : 0;
-  const strokeDash = RING_CIRCUMFERENCE * pct;
+  const usedRatio = amount > 0 ? Math.min(spent / amount, 1) : 0;
 
   return (
-    <LinearGradient
-      colors={[colors.oliveDark, colors.olive, colors.oliveLight]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.container, shadows.lg]}
-    >
-      <View style={styles.circle1} />
-      <View style={styles.circle2} />
-
-      {/* 상단 헤더 */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.sprout}>🌱</Text>
-          <Text style={styles.headerText}>오늘 안전하게 쓸 수 있는 금액</Text>
-        </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>안전 소비 가능</Text>
-        </View>
+    <View>
+      <Text style={styles.caption}>오늘 안전하게 쓸 수 있는 돈</Text>
+      <View style={styles.amountRow}>
+        <Text style={styles.amount}>{formatNumber(amount)}</Text>
+        <Text style={styles.won}>원</Text>
       </View>
+      <Text style={styles.income}>
+        다음 알바비까지 <Text style={styles.incomeDays}>{daysLeft}일</Text>
+      </Text>
 
-      {/* 원형 진행률 + 우측 텍스트 */}
-      <View style={styles.body}>
-        {/* SVG 원형 진행 그래프 */}
-        <View style={styles.chartWrap}>
-          <View style={{ transform: [{ rotate: '-90deg' }] }}>
-            <Svg width={128} height={128} viewBox="0 0 120 120">
-              <Circle
-                cx="60"
-                cy="60"
-                r={RING_R}
-                stroke="rgba(255,255,255,0.18)"
-                strokeWidth={10}
-                fill="none"
-              />
-              <Circle
-                cx="60"
-                cy="60"
-                r={RING_R}
-                stroke="#FFFDF5"
-                strokeWidth={10}
-                strokeLinecap="round"
-                fill="none"
-                strokeDasharray={`${strokeDash} ${RING_CIRCUMFERENCE}`}
-              />
-            </Svg>
-          </View>
-          <View style={styles.chartCenter}>
-            <Text style={styles.chartLabel}>남은 권장</Text>
-            <Text style={styles.chartValue}>{Number(remaining).toLocaleString()}</Text>
-            <Text style={styles.chartUnit}>원</Text>
-          </View>
-        </View>
-
-        {/* 우측 텍스트 */}
-        <View style={styles.textArea}>
-          <Text style={styles.mainAmount}>{formatCurrency(amount)}</Text>
-          <Text style={styles.daysText}>다음 알바비까지 {daysLeft}일 남았어요</Text>
-          <View style={styles.statusBox}>
-            <Text style={styles.statusText}>오늘은 아직 여유 있어요 🌱</Text>
-          </View>
-        </View>
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${usedRatio * 100}%` }]} />
       </View>
-
-      {/* 하단 3-grid */}
-      <View style={styles.grid}>
-        {[
-          ['권장', amount],
-          ['사용', spent],
-          ['남음', remaining],
-        ].map(([label, value]) => (
-          <View key={label} style={styles.gridCell}>
-            <Text style={styles.gridKey}>{label}</Text>
-            <Text style={styles.gridVal}>{formatCurrency(value)}</Text>
-          </View>
-        ))}
+      <View style={styles.usageRow}>
+        <Text style={styles.usageLabel}>
+          오늘 쓴 돈 <Text style={styles.usageValue}>{formatCurrency(spent)}</Text>
+        </Text>
+        <Text style={styles.usageLabel}>
+          남은 돈 <Text style={styles.usageValue}>{formatCurrency(remaining)}</Text>
+        </Text>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: radius.xxl,
-    padding: 20,
-    overflow: 'hidden',
+  caption: {
+    fontSize: 15,
+    color: redesign.textSecondary,
   },
-  circle1: {
-    position: 'absolute',
-    right: -24,
-    top: -24,
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  circle2: {
-    position: 'absolute',
-    right: -8,
-    top: 48,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  header: {
+  amountRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sprout: {
-    fontSize: 14,
-  },
-  headerText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  badge: {
-    backgroundColor: 'rgba(47,158,68,0.25)',
-    borderRadius: 9999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeText: {
-    fontSize: 10,
-    color: '#A8EFB8',
-  },
-  body: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 20,
-    marginBottom: 16,
-  },
-  chartWrap: {
-    width: 128,
-    height: 128,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chartCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  chartLabel: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  chartValue: {
-    fontSize: 17,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  chartUnit: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  textArea: {
-    flex: 1,
-  },
-  mainAmount: {
-    fontSize: 28,
-    color: colors.white,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  daysText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 4,
-  },
-  statusBox: {
+    alignItems: 'baseline',
     marginTop: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
   },
-  statusText: {
-    fontSize: 11,
-    color: colors.white,
+  amount: {
+    fontSize: 56,
+    fontWeight: '800',
+    color: redesign.textPrimary,
+    letterSpacing: -1,
   },
-  grid: {
+  won: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: redesign.accent,
+    marginLeft: 8,
+  },
+  income: {
+    fontSize: 14,
+    color: redesign.textPrimary,
+    marginTop: 12,
+  },
+  incomeDays: {
+    fontWeight: '700',
+    color: redesign.accent,
+  },
+  track: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: redesign.divider,
+    overflow: 'hidden',
+    marginTop: 24,
+  },
+  fill: {
+    height: 4,
+    backgroundColor: redesign.textPrimary,
+  },
+  usageRow: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
-  gridCell: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  gridKey: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  gridVal: {
+  usageLabel: {
     fontSize: 12,
-    color: colors.white,
-    fontWeight: '600',
-    marginTop: 2,
+    color: redesign.textSecondary,
+  },
+  usageValue: {
+    fontWeight: '700',
+    color: redesign.textPrimary,
   },
 });

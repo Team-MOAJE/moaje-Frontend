@@ -12,7 +12,6 @@ import AnalysisScreen from '../screens/asset/AnalysisScreen';
 import TransferScreen from '../screens/asset/TransferScreen';
 import RecommendationScreen from '../screens/work/RecommendationScreen';
 import MFAScreen from '../screens/auth/MFAScreen';
-import SupportScreen from '../screens/support/SupportScreen';
 import CategoryScreen from '../screens/category/CategoryScreen';
 import MoneyRecapScreen from '../screens/asset/MoneyRecapScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
@@ -95,11 +94,6 @@ const MainNavigator = () => {
         name={ROUTES.MFA_SCREEN}
         component={MFAScreen}
         options={{ title: '추가 인증' }}
-      />
-      <Stack.Screen
-        name={ROUTES.SUPPORT_SCREEN}
-        component={SupportScreen}
-        options={{ title: '고객센터' }}
       />
       <Stack.Screen
         name={ROUTES.CATEGORY}

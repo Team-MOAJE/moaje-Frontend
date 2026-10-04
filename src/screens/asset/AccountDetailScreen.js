@@ -58,7 +58,6 @@ export default function AccountDetailScreen({ navigation, route }) {
   };
 
   const handleHistoryPress = () => navigation.navigate(ROUTES.TRANSACTION_HISTORY);
-  const handleViewAllTransactionsPress = () => navigation.navigate(ROUTES.TRANSACTION_HISTORY);
 
   return (
     <AccountDetailView
@@ -83,7 +82,6 @@ export default function AccountDetailScreen({ navigation, route }) {
       onBack={handleBack}
       onTransferPress={handleTransferPress}
       onHistoryPress={handleHistoryPress}
-      onViewAllTransactionsPress={handleViewAllTransactionsPress}
     />
   );
 }

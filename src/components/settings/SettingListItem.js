@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
-import { colors } from '../../theme';
+import { View, Text, TouchableOpacity, Pressable, Animated, StyleSheet } from 'react-native';
+import { redesign } from '../../theme/redesign';
 
 export function SettingToggle({ label, defaultOn = false, onChange }) {
   const [on, setOn] = useState(defaultOn);
@@ -25,7 +25,8 @@ export function SettingToggle({ label, defaultOn = false, onChange }) {
       <TouchableOpacity
         onPress={toggle}
         activeOpacity={0.9}
-        style={[styles.track, { backgroundColor: on ? colors.olive : colors.border }]}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        style={[styles.track, { backgroundColor: on ? redesign.accent : redesign.navInactive }]}
       >
         <Animated.View style={[styles.thumb, { transform: [{ translateX }] }]} />
       </TouchableOpacity>
@@ -35,10 +36,13 @@ export function SettingToggle({ label, defaultOn = false, onChange }) {
 
 export function SettingValueRow({ label, value, onPress }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.75 : 1} style={styles.row}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, onPress && pressed && styles.rowPressed]}
+    >
       <Text style={styles.label}>{label}</Text>
       <Text style={styles.value}>{value}</Text>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -51,17 +55,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    minHeight: 56,
+  },
+  rowPressed: {
+    backgroundColor: redesign.surfaceSoft,
   },
   label: {
-    fontSize: 14,
-    color: colors.textDark,
+    fontSize: 16,
+    fontWeight: '500',
+    color: redesign.textPrimary,
     flex: 1,
   },
   value: {
     fontSize: 14,
-    color: colors.textMid,
+    color: redesign.textSecondary,
   },
   track: {
     width: 44,
@@ -73,16 +80,10 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#FFFFFF',
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 16,
+    backgroundColor: redesign.divider,
   },
 });

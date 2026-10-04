@@ -3,19 +3,16 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { useSelector, useDispatch } from 'react-redux';
-import { colors, radius, shadows, spacing } from '../../theme';
+import { colors } from '../../theme';
+import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
 import {
   fetchAccounts,
@@ -30,7 +27,7 @@ import TransactionPeriodModal, {
   computePeriodRange,
   getPeriodLabel,
 } from './TransactionPeriodModal';
-import TransactionListItem from '../../components/asset/TransactionListItem';
+import TransactionStatusBadge from '../../components/asset/TransactionStatusBadge';
 
 const FILTERS = ['전체', '입금', '출금', '송금'];
 
@@ -62,35 +59,18 @@ const matchesFilter = (tx, f) => {
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────────
 
-function TransactionSummaryCard({ bank, token, current, available }) {
+function TransactionSummary({ bank, token, current, available }) {
   return (
-    <View style={[summaryStyles.container, shadows.md]}>
-      <View style={summaryStyles.accountRow}>
-        <LinearGradient
-          colors={[colors.oliveLight, colors.olive]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={summaryStyles.iconBox}
-        >
-          <MaterialCommunityIcons name="wallet" size={20} color={colors.white} />
-        </LinearGradient>
+    <View style={summaryStyles.container}>
+      <Text style={summaryStyles.bankName}>{bank}</Text>
+      <Text style={summaryStyles.token}>{token}</Text>
 
-        <View style={{ flex: 1 }}>
-          <Text style={summaryStyles.bankName}>{bank}</Text>
-          <Text style={summaryStyles.token}>{token}</Text>
-        </View>
+      <Text style={summaryStyles.currentLabel}>현재 잔액</Text>
+      <Text style={summaryStyles.currentBalance}>{current.toLocaleString()}원</Text>
 
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={summaryStyles.currentLabel}>현재 잔액</Text>
-          <Text style={summaryStyles.currentBalance}>{current.toLocaleString()}원</Text>
-        </View>
-      </View>
-
-      <View style={summaryStyles.grid}>
-        <View style={summaryStyles.availableBox}>
-          <Text style={summaryStyles.gridLabel}>사용 가능 금액</Text>
-          <Text style={summaryStyles.gridVal}>{available.toLocaleString()}원</Text>
-        </View>
+      <View style={summaryStyles.availableRow}>
+        <Text style={summaryStyles.availableLabel}>사용 가능 금액</Text>
+        <Text style={summaryStyles.availableVal}>{available.toLocaleString()}원</Text>
       </View>
     </View>
   );
@@ -98,150 +78,157 @@ function TransactionSummaryCard({ bank, token, current, available }) {
 
 const summaryStyles = StyleSheet.create({
   container: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 8,
   },
   bankName: {
-    fontSize: 14,
-    color: colors.textDark,
+    fontSize: 15,
+    fontWeight: '600',
+    color: redesign.textPrimary,
   },
   token: {
-    fontSize: 11,
-    color: colors.textMid,
-    marginTop: 1,
+    fontSize: 12,
+    color: redesign.textSecondary,
+    marginTop: 2,
   },
   currentLabel: {
-    fontSize: 10,
-    color: colors.textMid,
+    fontSize: 12,
+    color: redesign.textSecondary,
+    marginTop: 20,
   },
   currentBalance: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textDark,
-  },
-  grid: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  availableBox: {
-    flex: 1,
-    backgroundColor: colors.bgMain,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  gridLabel: {
-    fontSize: 10,
-    color: colors.textMid,
-  },
-  gridVal: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textDark,
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
     marginTop: 2,
+  },
+  availableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
+  },
+  availableLabel: {
+    fontSize: 13,
+    color: redesign.textSecondary,
+  },
+  availableVal: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: redesign.textPrimary,
   },
 });
 
-function CachedDataBanner() {
+function TransactionFilterTab({ label, active, onPress }) {
   return (
-    <View style={cachedStyles.container}>
-      <View style={cachedStyles.badge}>
-        <Text style={cachedStyles.badgeText}>캐시 데이터</Text>
-      </View>
-      <Text style={cachedStyles.text}>금융망 점검으로 최근 저장된 거래내역을 보여주고 있어요.</Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+      style={[filterStyles.tab, active && filterStyles.tabActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[filterStyles.text, active && filterStyles.textActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
-const cachedStyles = StyleSheet.create({
+const filterStyles = StyleSheet.create({
+  tab: {
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: redesign.accent,
+  },
+  text: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: redesign.textSecondary,
+  },
+  textActive: {
+    fontWeight: '600',
+    color: redesign.accent,
+  },
+});
+
+// 정상 완료 상태는 사용자에게 badge로 노출하지 않고 보조 정보에 거래 종류만 표시한다.
+// 그 외 상태(pending/failed 등 향후 예외 상태)는 의미가 있으므로 기존 badge로 계속 보여준다.
+const NORMAL_STATUS_KIND = {
+  completed: '송금',
+  depositCompleted: '입금',
+  expenseCompleted: '출금',
+};
+
+function TransactionHistoryRow({ tx, onPress }) {
+  const positive = tx.amount > 0;
+  const kind = NORMAL_STATUS_KIND[tx.status];
+  const isNormalStatus = kind !== undefined;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [rowStyles.container, pressed && rowStyles.pressed]}
+      accessibilityRole="button"
+    >
+      <View style={rowStyles.left}>
+        <Text style={rowStyles.counterparty} numberOfLines={1}>
+          {tx.counterparty}
+        </Text>
+        <Text style={rowStyles.meta} numberOfLines={1}>
+          {kind ? `${kind} · ` : ''}
+          {tx.time}
+        </Text>
+      </View>
+
+      <View style={rowStyles.right}>
+        <Text style={[rowStyles.amount, { color: positive ? colors.green : redesign.textPrimary }]}>
+          {positive ? '+' : ''}
+          {tx.amount.toLocaleString()}원
+        </Text>
+        {!isNormalStatus && <TransactionStatusBadge status={tx.status} />}
+      </View>
+    </Pressable>
+  );
+}
+
+const rowStyles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.bgWarn,
-    borderWidth: 1,
-    borderColor: colors.borderWarn,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: 12,
+    minHeight: 68,
+    paddingVertical: 12,
   },
-  badge: {
-    backgroundColor: colors.orange,
-    borderRadius: radius.full,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+  pressed: {
+    backgroundColor: redesign.surfaceSoft,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  text: {
+  left: {
     flex: 1,
-    fontSize: 11,
-    color: colors.orange,
-    lineHeight: 16,
+    minWidth: 0,
   },
-});
-
-function TransactionFilterChip({ label, active, onPress }) {
-  if (active) {
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-        <LinearGradient
-          colors={[colors.olive, colors.oliveDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={chipStyles.base}
-        >
-          <Text style={[chipStyles.text, { color: colors.cream }]}>{label}</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  }
-
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.75}
-      style={[chipStyles.base, chipStyles.inactive]}
-    >
-      <Text style={[chipStyles.text, { color: colors.textDark }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-const chipStyles = StyleSheet.create({
-  base: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-  },
-  inactive: {
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  text: {
-    fontSize: 12,
+  counterparty: {
+    fontSize: 16,
     fontWeight: '500',
+    color: redesign.textPrimary,
+  },
+  meta: {
+    fontSize: 13,
+    color: redesign.textSecondary,
+    marginTop: 3,
+  },
+  right: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  amount: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 
@@ -262,7 +249,6 @@ function SkeletonRow({ delay }) {
 
   return (
     <Animated.View style={[skeletonStyles.row, { opacity }]}>
-      <View style={skeletonStyles.iconBox} />
       <View style={{ flex: 1, gap: 6 }}>
         <View style={[skeletonStyles.bar, { width: 96, height: 12 }]} />
         <View style={[skeletonStyles.bar, { width: 128, height: 10, opacity: 0.65 }]} />
@@ -290,48 +276,28 @@ function TransactionLoadingSkeleton() {
 
 const skeletonStyles = StyleSheet.create({
   container: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    marginTop: 8,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: colors.border,
-    flexShrink: 0,
+    gap: 12,
+    minHeight: 68,
+    paddingVertical: 12,
   },
   bar: {
     borderRadius: 4,
-    backgroundColor: colors.border,
+    backgroundColor: redesign.divider,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
+    backgroundColor: redesign.divider,
   },
 });
 
 function TransactionEmptyState({ onTransfer }) {
   return (
     <View style={emptyStyles.container}>
-      <LinearGradient
-        colors={[colors.oliveLight, colors.olive]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={emptyStyles.iconWrap}
-      >
-        <Text style={emptyStyles.iconEmoji}>🌱</Text>
-      </LinearGradient>
-
       <Text style={emptyStyles.title}>아직 거래내역이 없어요.</Text>
       <Text style={emptyStyles.desc}>
         {'송금하거나 계좌를 연결하면\n자산 흐름이 여기에 표시돼요.'}
@@ -340,28 +306,19 @@ function TransactionEmptyState({ onTransfer }) {
       <View style={emptyStyles.actions}>
         <Pressable
           onPress={onTransfer}
-          style={({ pressed }) => [emptyStyles.primaryBtn, pressed && { opacity: 0.75 }]}
+          style={({ pressed }) => [emptyStyles.primaryBtn, pressed && { opacity: 0.85 }]}
         >
-          <LinearGradient
-            colors={[colors.olive, colors.oliveDeep]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={emptyStyles.primaryBtnInner}
-          >
-            <Text style={emptyStyles.primaryBtnText}>송금하기</Text>
-          </LinearGradient>
+          <Text style={emptyStyles.primaryBtnText}>송금하기</Text>
         </Pressable>
 
         <Pressable
           style={({ pressed }) => [
             emptyStyles.secondaryBtn,
-            pressed && { backgroundColor: colors.bgOuter },
+            pressed && emptyStyles.secondaryPressed,
           ]}
         >
           <Text style={emptyStyles.secondaryBtnText}>계좌 연결</Text>
-          <View style={emptyStyles.comingSoonBadge}>
-            <Feather name="lock" size={8} color={colors.textLight} />
-          </View>
+          <Feather name="lock" size={12} color={redesign.navInactive} />
         </Pressable>
       </View>
     </View>
@@ -370,107 +327,80 @@ function TransactionEmptyState({ onTransfer }) {
 
 const emptyStyles = StyleSheet.create({
   container: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 24,
-    alignItems: 'center',
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconEmoji: {
-    fontSize: 28,
+    paddingTop: 48,
+    paddingBottom: 24,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textDark,
-    marginTop: 12,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '700',
+    color: redesign.textPrimary,
   },
   desc: {
-    fontSize: 12,
-    color: 'rgba(111,127,63,0.8)',
-    textAlign: 'center',
-    marginTop: 4,
-    lineHeight: 18,
+    fontSize: 14,
+    color: redesign.textSecondary,
+    marginTop: 8,
+    lineHeight: 21,
   },
   actions: {
-    width: '100%',
-    marginTop: 16,
+    marginTop: 28,
     gap: 8,
   },
   primaryBtn: {
-    borderRadius: radius.lg,
-    ...shadows.sm,
-  },
-  primaryBtnInner: {
-    borderRadius: radius.lg,
-    paddingVertical: 14,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: redesign.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    color: colors.white,
+    color: '#FFFFFF',
   },
   secondaryBtn: {
-    borderRadius: radius.lg,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 14,
+    height: 52,
+    borderRadius: 12,
+    flexDirection: 'row',
+    gap: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.xs,
+  },
+  secondaryPressed: {
+    backgroundColor: redesign.surfaceSoft,
   },
   secondaryBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.textMid,
-  },
-  comingSoonBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 12,
-    width: 16,
-    height: 16,
-    borderRadius: radius.full,
-    backgroundColor: colors.bgOuter,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: redesign.textSecondary,
   },
 });
 
 function TransactionLoadMoreFooter({ isLoadingMore }) {
-  if (!isLoadingMore) return null;
   return (
-    <View style={footerStyles.container}>
-      <ActivityIndicator size="small" color={colors.olive} />
+    <View>
+      {isLoadingMore && (
+        <View style={footerStyles.loaderRow}>
+          <ActivityIndicator size="small" color={redesign.accent} />
+        </View>
+      )}
+      <View style={footerStyles.spacer} />
     </View>
   );
 }
 
 const footerStyles = StyleSheet.create({
-  container: {
-    paddingVertical: spacing.lg,
+  loaderRow: {
+    paddingVertical: 16,
     alignItems: 'center',
+  },
+  spacer: {
+    height: 40,
   },
 });
 
 function TransactionErrorState({ message }) {
   return (
     <View style={errorStyles.container}>
-      <Feather name="alert-triangle" size={22} color={colors.red} />
       <Text style={errorStyles.text}>{message}</Text>
     </View>
   );
@@ -478,54 +408,12 @@ function TransactionErrorState({ message }) {
 
 const errorStyles = StyleSheet.create({
   container: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 24,
-    alignItems: 'center',
-    gap: 8,
+    paddingTop: 48,
   },
   text: {
-    fontSize: 13,
-    color: colors.textMid,
-    textAlign: 'center',
-  },
-});
-
-function PeriodSelector({ label, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [periodStyles.button, pressed && periodStyles.buttonPressed]}
-    >
-      <Feather name="calendar" size={14} color={colors.olive} />
-      <Text style={periodStyles.text}>{label}</Text>
-      <Feather name="chevron-down" size={14} color={colors.textMid} />
-    </Pressable>
-  );
-}
-
-const periodStyles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  buttonPressed: {
-    backgroundColor: colors.bgOuter,
-  },
-  text: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textDark,
+    fontSize: 14,
+    color: redesign.textSecondary,
+    lineHeight: 21,
   },
 });
 
@@ -652,37 +540,62 @@ export default function TransactionHistoryScreen({ navigation }) {
   const isFilteredEmpty = !isInitialLoading && filtered.length === 0 && !transactionsError;
   const isNarrowedByFilter = filter !== '전체' || periodType !== '전체';
 
+  const renderGroup = ({ item }) => (
+    <View style={styles.group}>
+      <Text style={styles.groupLabel}>{item.group}</Text>
+      <View style={styles.groupList}>
+        {item.items.map((t, i, arr) => (
+          <View key={t.id}>
+            <TransactionHistoryRow
+              tx={t}
+              onPress={
+                t.status === 'checking' || t.status === 'pending'
+                  ? undefined
+                  : () => handleTxPress(t)
+              }
+            />
+            {i < arr.length - 1 && <View style={styles.divider} />}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
   const listHeader = (
-    <View style={{ gap: 12, marginBottom: 12 }}>
-      {/* 잔액 요약 카드 */}
-      <TransactionSummaryCard
+    <View>
+      {/* 잔액 요약 */}
+      <TransactionSummary
         bank={defaultAccount?.bankName ?? '-'}
         token={defaultAccount?.tokenId ?? '-'}
         current={summary?.currentBalance ?? 0}
         available={summary?.availableBalance ?? 0}
       />
 
-      {/* 기간 선택 */}
-      <PeriodSelector
-        label={getPeriodLabel(periodType, customStartKey, customEndKey)}
-        onPress={() => setPeriodModalVisible(true)}
-      />
-
-      {/* 필터 칩 가로 스크롤 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
+      {/* 필터 */}
+      <View style={styles.filterRow}>
         {FILTERS.map(f => (
-          <TransactionFilterChip
+          <TransactionFilterTab
             key={f}
             label={f}
             active={filter === f}
             onPress={() => setFilter(f)}
           />
         ))}
-      </ScrollView>
+      </View>
+
+      {/* 기간 선택 */}
+      <Pressable
+        onPress={() => setPeriodModalVisible(true)}
+        style={({ pressed }) => [styles.periodRow, pressed && styles.periodRowPressed]}
+      >
+        <Text style={styles.periodLabel}>조회 기간</Text>
+        <View style={styles.periodValueWrap}>
+          <Text style={styles.periodValue}>
+            {getPeriodLabel(periodType, customStartKey, customEndKey)}
+          </Text>
+          <Feather name="chevron-right" size={16} color={redesign.navInactive} />
+        </View>
+      </Pressable>
     </View>
   );
 
@@ -707,22 +620,24 @@ export default function TransactionHistoryScreen({ navigation }) {
         <View style={styles.header}>
           <Pressable
             onPress={handleBack}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="뒤로가기"
           >
-            <Feather name="arrow-left" size={20} color={colors.textDark} />
+            <Feather name="arrow-left" size={22} color={redesign.textPrimary} />
           </Pressable>
-
-          <Text style={styles.headerTitle}>거래내역</Text>
 
           <Pressable
             onPress={handleRefresh}
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={({ pressed }) => pressed && styles.pressedDim}
+            accessibilityRole="button"
+            accessibilityLabel="새로고침"
           >
-            <Feather name="refresh-cw" size={18} color={colors.textDark} />
+            <Feather name="refresh-cw" size={20} color={redesign.accent} />
           </Pressable>
         </View>
-
-        <Text style={styles.headerSub}>최근 자산 흐름과 처리 상태를 확인해보세요.</Text>
 
         <FlatList
           style={styles.scroll}
@@ -730,34 +645,17 @@ export default function TransactionHistoryScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           data={listData}
           keyExtractor={item => item.group}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmpty}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          renderItem={({ item }) => (
-            <View style={[styles.groupCard, shadows.sm]}>
-              <Text style={styles.groupLabel}>{item.group}</Text>
-              <View>
-                {item.items.map((t, i, arr) => (
-                  <View key={t.id}>
-                    <TransactionListItem
-                      tx={t}
-                      onPress={
-                        t.status === 'checking' || t.status === 'pending'
-                          ? null
-                          : () => handleTxPress(t)
-                      }
-                    />
-                    {i < arr.length - 1 && <View style={styles.divider} />}
-                  </View>
-                ))}
-              </View>
+          renderItem={renderGroup}
+          ListHeaderComponent={
+            <View>
+              <Text style={styles.screenTitle}>거래내역</Text>
+              <Text style={styles.headerSub}>최근 자산 흐름과 처리 상태를 확인해보세요.</Text>
+              {listHeader}
             </View>
-          )}
+          }
+          ListEmptyComponent={listEmpty}
           ListFooterComponent={
-            <>
-              <TransactionLoadMoreFooter isLoadingMore={transactionsLoadingMore} />
-              <View style={{ height: 40 }} />
-            </>
+            <TransactionLoadMoreFooter isLoadingMore={transactionsLoadingMore} />
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
@@ -779,94 +677,98 @@ export default function TransactionHistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.bgMain,
+    backgroundColor: redesign.bg,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.sm,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.textDark,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-      },
-      android: { elevation: 1 },
-    }),
+  pressedDim: {
+    opacity: 0.6,
   },
-  headerBtnPressed: {
-    backgroundColor: colors.bgOuter,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textDark,
+  screenTitle: {
+    fontSize: 29,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -0.6,
+    color: redesign.textPrimary,
   },
   headerSub: {
-    fontSize: 12,
-    color: 'rgba(111,127,63,0.8)',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
+    marginTop: 8,
+    fontSize: 13,
+    color: redesign.textSecondary,
   },
   scroll: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: redesign.pagePaddingX,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   filterRow: {
-    gap: 8,
-    paddingRight: 4,
+    flexDirection: 'row',
+    gap: 24,
+    marginTop: 28,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
   },
-  groupCard: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+  periodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: redesign.divider,
+  },
+  periodRowPressed: {
+    backgroundColor: redesign.surfaceSoft,
+  },
+  periodLabel: {
+    fontSize: 13,
+    color: redesign.textSecondary,
+  },
+  periodValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  periodValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: redesign.textPrimary,
+  },
+  group: {
+    marginTop: 28,
   },
   groupLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.textMid,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: 4,
+    color: redesign.accent,
+    marginBottom: 4,
+  },
+  groupList: {
+    borderTopWidth: 1,
+    borderTopColor: redesign.divider,
   },
   emptyFilter: {
-    borderRadius: radius.xl,
-    backgroundColor: colors.cream,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 24,
-    alignItems: 'center',
+    paddingTop: 48,
+    alignItems: 'flex-start',
   },
   emptyFilterText: {
     fontSize: 14,
-    color: colors.textMid,
+    color: redesign.textSecondary,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
-    marginLeft: 68,
+    backgroundColor: redesign.divider,
   },
 });
