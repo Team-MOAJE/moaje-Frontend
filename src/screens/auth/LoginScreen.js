@@ -1,20 +1,42 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ROUTES } from '../../constants/routes';
+import { LOGIN_ILLUSTRATION } from '../../constants/loginAssets';
 import { redesign } from '../../theme/redesign';
 
 const LoginScreen = ({ navigation }) => {
+  const { height: windowHeight } = useWindowDimensions();
+
   const handlePhoneLogin = () => navigation.navigate(ROUTES.PHONE_LOGIN);
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Hero ─────────────────────────────── */}
-      <View style={styles.hero}>
+      {/* ── 상단 브랜드 영역 ─────────────────────────────── */}
+      <View style={[styles.brand, { paddingTop: Math.round(windowHeight * 0.06) }]}>
         <View style={styles.accentLine} />
         <Text style={styles.wordmark}>MOAJE</Text>
         <Text style={styles.headline}>{'오늘 쓸 돈을,\n내일 걱정 없이.'}</Text>
+      </View>
+
+      {/* ── 중앙 일러스트 영역: 남는 공간 안에서 contain으로 비율 유지(찌그러짐/잘림 없이 축소) ───── */}
+      <View style={styles.illustrationArea}>
+        <Image
+          source={LOGIN_ILLUSTRATION}
+          style={styles.illustration}
+          resizeMode="contain"
+          accessible={false}
+          accessibilityIgnoresInvertColors
+        />
       </View>
 
       {/* ── 버튼 영역 ─────────────────────────────── */}
@@ -51,11 +73,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: redesign.bg,
   },
-  hero: {
+  brand: {
+    paddingHorizontal: redesign.pagePaddingX,
+  },
+  illustrationArea: {
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: redesign.pagePaddingX,
-    paddingTop: 48,
+    paddingVertical: 16,
+  },
+  illustration: {
+    width: '100%',
+    maxWidth: 360,
+    height: '100%',
   },
   accentLine: {
     width: 24,
