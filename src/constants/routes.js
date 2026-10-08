@@ -4,7 +4,6 @@ export const ROUTES = {
   PHONE_LOGIN: 'PhoneLogin',
   SIGNUP: 'Signup',
   SIGNUP_PHONE: 'SignupPhone',
-  SIGNUP_PHONE_VERIFY: 'SignupPhoneVerify',
   SIGNUP_NAME: 'SignupName',
   MAIN_STACK: 'MainStack',
   HOME: 'Home',
@@ -22,6 +21,7 @@ export const ROUTES = {
   TRANSACTION_DETAIL: 'TransactionDetail',
   ANALYSIS: 'Analysis',
   PIN_INPUT: 'PinInput',
+  PIN_RESET_VERIFY: 'PinResetVerify',
 
   // 재무 온보딩(My Future)
   FINANCIAL_ONBOARDING: 'FinancialOnboarding',

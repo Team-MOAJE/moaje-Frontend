@@ -14,8 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { ROUTES } from '../../../constants/routes';
 import { colors } from '../../../theme';
 import { redesign } from '../../../theme/redesign';
-
-const validateName = v => /^[가-힣]+$/.test(v);
+import { sanitizeName, validateName } from '../../../utils/authValidators';
 
 const SignupNameScreen = ({ navigation, route }) => {
   const { phoneNumber, termsRecords } = route.params ?? {};
@@ -24,7 +23,7 @@ const SignupNameScreen = ({ navigation, route }) => {
   const [touched, setTouched] = useState(false);
   const [focused, setFocused] = useState(false);
 
-  const handleNameChange = text => setName(text.replace(/[^가-힣ㄱ-ㅎㅏ-ㅣ]/g, ''));
+  const handleNameChange = text => setName(sanitizeName(text));
   const nameInvalid = touched && name.length > 0 && !validateName(name);
   const allValid = validateName(name);
 

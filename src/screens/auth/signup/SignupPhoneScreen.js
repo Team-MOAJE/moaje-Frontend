@@ -11,52 +11,34 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useDispatch } from 'react-redux';
 import { ROUTES } from '../../../constants/routes';
 import { colors } from '../../../theme';
 import { redesign } from '../../../theme/redesign';
-import { requestPhoneVerification } from '../../../features/auth/authApi';
-import { clearVerificationProof } from '../../../features/auth/signupFlowMemory';
-
-// 휴대폰 번호: 빈값 아님 + 숫자만 + 9~11자리 (통신사별 세부 규칙/인증번호 자릿수는 확정되지 않았으므로 검증하지 않음)
-const validatePhoneNumber = v => /^[0-9]{9,11}$/.test(v);
+import {
+  PHONE_NUMBER_ERROR_MESSAGE,
+  PHONE_NUMBER_MAX_LENGTH,
+  sanitizePhoneNumber,
+  validatePhoneNumber,
+} from '../../../utils/authValidators';
 
 const SignupPhoneScreen = ({ navigation, route }) => {
-  const dispatch = useDispatch();
-  const { termsRecords } = route.params ?? {};
+  const { phoneNumber: initialPhoneNumber, termsRecords } = route.params ?? {};
 
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState(initialPhoneNumber ?? '');
   const [touched, setTouched] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
 
-  const handlePhoneNumberChange = text => setPhoneNumber(text.replace(/[^0-9]/g, '').slice(0, 11));
+  const handlePhoneNumberChange = text => setPhoneNumber(sanitizePhoneNumber(text));
   const phoneNumberInvalid = touched && phoneNumber.length > 0 && !validatePhoneNumber(phoneNumber);
   const allValid = validatePhoneNumber(phoneNumber);
 
   const handleBack = () => navigation.popToTop();
 
-  const handleRequestVerification = async () => {
+  const handleNext = () => {
     setTouched(true);
-    if (!allValid || isSubmitting) return;
-
-    // 새 SMS 인증 flow 시작(전화번호가 바뀌었을 수 있음) — 이전 증빙은 무조건 무효화한다.
-    clearVerificationProof();
-    setErrorMsg('');
-
-    setIsSubmitting(true);
-    try {
-      await dispatch(requestPhoneVerification({ phoneNumber })).unwrap();
-      navigation.navigate(ROUTES.SIGNUP_PHONE_VERIFY, { phoneNumber, termsRecords });
-    } catch {
-      setErrorMsg('휴대폰 인증 기능은 아직 준비 중이에요.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!allValid) return;
+    navigation.navigate(ROUTES.SIGNUP_NAME, { phoneNumber, termsRecords });
   };
-
-  const ctaActive = allValid && !isSubmitting;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -82,7 +64,7 @@ const SignupPhoneScreen = ({ navigation, route }) => {
           keyboardShouldPersistTaps="handled"
         >
           <Text style={styles.headline}>{'휴대폰 번호를\n입력해 주세요'}</Text>
-          <Text style={styles.desc}>회원가입을 위해 휴대폰 번호로 인증번호를 받아요.</Text>
+          <Text style={styles.desc}>회원가입에 사용할 휴대폰 번호를 입력해 주세요.</Text>
 
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>휴대폰 번호</Text>
@@ -101,33 +83,29 @@ const SignupPhoneScreen = ({ navigation, route }) => {
               }}
               placeholder="휴대폰 번호를 입력해 주세요"
               placeholderTextColor={redesign.navInactive}
-              keyboardType="phone-pad"
+              keyboardType="number-pad"
+              maxLength={PHONE_NUMBER_MAX_LENGTH}
             />
             {phoneNumberInvalid && (
-              <Text style={styles.errorText}>휴대폰 번호를 올바르게 입력해 주세요.</Text>
+              <Text style={styles.errorText}>{PHONE_NUMBER_ERROR_MESSAGE}</Text>
             )}
           </View>
-
-          {errorMsg ? <Text style={styles.errorMsg}>{errorMsg}</Text> : null}
         </ScrollView>
 
         <View style={styles.footer}>
           <TouchableOpacity
-            onPress={handleRequestVerification}
-            disabled={!allValid || isSubmitting}
+            onPress={handleNext}
+            disabled={!allValid}
             activeOpacity={allValid ? 0.85 : 1}
-            style={[
-              styles.submitBtn,
-              ctaActive ? styles.submitBtnActive : styles.submitBtnDisabled,
-            ]}
+            style={[styles.submitBtn, allValid ? styles.submitBtnActive : styles.submitBtnDisabled]}
           >
             <Text
               style={[
                 styles.submitBtnText,
-                ctaActive ? styles.submitTextActive : styles.submitTextDisabled,
+                allValid ? styles.submitTextActive : styles.submitTextDisabled,
               ]}
             >
-              {isSubmitting ? '요청 중...' : '인증번호 받기'}
+              다음
             </Text>
           </TouchableOpacity>
         </View>
@@ -193,11 +171,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.red,
     lineHeight: 17,
-  },
-  errorMsg: {
-    marginTop: 16,
-    fontSize: 13,
-    color: colors.red,
   },
 
   footer: {

@@ -6,9 +6,14 @@ import { useDispatch } from 'react-redux';
 import { colors } from '../../theme';
 import { redesign } from '../../theme/redesign';
 import { API_CODES } from '../../constants/apiCodes';
-import { loginUser, registerUser, verifyUnlockPin } from '../../features/auth/authApi';
+import {
+  loginUser,
+  registerUser,
+  confirmPinReset,
+  verifyUnlockPin,
+} from '../../features/auth/authApi';
 import { unlockApp } from '../../features/auth/authSlice';
-import { getVerificationProof, clearVerificationProof } from '../../features/auth/signupFlowMemory';
+import { ROUTES } from '../../constants/routes';
 
 const PIN_LENGTH = 6;
 
@@ -89,6 +94,10 @@ const TITLES = {
     },
     confirm: { title: 'PIN 재입력', subtitle: '다시 한 번 입력해 주세요.' },
   },
+  reset: {
+    setup: { title: '새 PIN 설정', subtitle: '새로 사용할 숫자 6자리 PIN을 설정해 주세요.' },
+    confirm: { title: 'PIN 재입력', subtitle: '다시 한 번 입력해 주세요.' },
+  },
   unlock: {
     setup: { title: 'PIN 번호 입력', subtitle: '안전한 이용을 위해 PIN 번호를 입력해 주세요.' },
   },
@@ -100,13 +109,13 @@ export default function PinInputScreen({ navigation, route }) {
 
   const [pin, setPin] = useState([]);
   const [errorMsg, setErrorMsg] = useState('');
-  const [phase, setPhase] = useState('setup'); // 'setup' | 'confirm' — signup 모드에서만 의미 있음
+  const [phase, setPhase] = useState('setup'); // 'setup' | 'confirm' — signup/reset 모드에서만 의미 있음
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
 
   const pendingPinRef = useRef(null);
 
-  const isTwoPhaseMode = mode === 'signup';
+  const isTwoPhaseMode = mode === 'signup' || mode === 'reset';
   const copy = TITLES[mode]?.[isTwoPhaseMode ? phase : 'setup'] ?? TITLES.login.setup;
 
   const resetInput = useCallback(() => setPin([]), []);
@@ -152,13 +161,16 @@ export default function PinInputScreen({ navigation, route }) {
 
       setIsSubmitting(true);
       setErrorMsg('');
-      const verificationProof = getVerificationProof('signup', phoneNumber);
       try {
-        await dispatch(
-          registerUser({ phoneNumber, name, pin: enteredPin, verificationProof, termsRecords })
-        ).unwrap();
-        // 성공 시 navigate 없음 — authSlice가 인증 상태 반영, RootNavigator가 자동 전환한다.
-        clearVerificationProof();
+        if (mode === 'signup') {
+          await dispatch(
+            registerUser({ phoneNumber, name, pin: enteredPin, termsRecords })
+          ).unwrap();
+          // 성공 시 navigate 없음 — authSlice가 인증 상태 반영, RootNavigator가 자동 전환한다.
+        } else {
+          await dispatch(confirmPinReset({ phoneNumber, pin: enteredPin })).unwrap();
+          navigation.popToTop();
+        }
       } catch {
         setErrorMsg('처리 중 문제가 발생했어요. 다시 시도해 주세요.');
         setPhase('setup');
@@ -168,7 +180,7 @@ export default function PinInputScreen({ navigation, route }) {
         setIsSubmitting(false);
       }
     },
-    [dispatch, phoneNumber, name, termsRecords, resetInput]
+    [dispatch, mode, phoneNumber, name, termsRecords, navigation, resetInput]
   );
 
   const handleUnlockAttempt = useCallback(
@@ -248,6 +260,10 @@ export default function PinInputScreen({ navigation, route }) {
     }
   };
 
+  const handleResetPin = () => {
+    navigation.navigate(ROUTES.PIN_RESET_VERIFY, { phoneNumber });
+  };
+
   const keypadDisabled = isSubmitting || isLocked;
 
   return (
@@ -281,8 +297,14 @@ export default function PinInputScreen({ navigation, route }) {
         {isLocked && (
           <View style={styles.lockedBox}>
             <Text style={styles.lockedText}>
-              PIN이 여러 번 잘못 입력되어 잠겼어요. 잠시 후 다시 시도해 주세요.
+              PIN이 여러 번 잘못 입력되어 잠겼어요. 회원정보 확인 후 새 PIN을 설정해주세요.
             </Text>
+            <Pressable
+              style={({ pressed }) => [styles.lockedCta, pressed && styles.lockedCtaPressed]}
+              onPress={handleResetPin}
+            >
+              <Text style={styles.lockedCtaText}>PIN 재설정하기</Text>
+            </Pressable>
           </View>
         )}
       </View>
@@ -290,6 +312,15 @@ export default function PinInputScreen({ navigation, route }) {
       {!isLocked && (
         <View style={styles.keypadWrapper}>
           <PinKeypad onPressNum={handleNum} onPressDel={handleDel} disabled={keypadDisabled} />
+          {mode === 'login' && (
+            <Pressable
+              onPress={handleResetPin}
+              hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+              style={styles.forgotBtn}
+            >
+              <Text style={styles.forgotText}>PIN을 잊으셨나요?</Text>
+            </Pressable>
+          )}
         </View>
       )}
     </SafeAreaView>
@@ -373,6 +404,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: colors.red,
+  },
+  lockedCta: {
+    height: 52,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: redesign.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockedCtaPressed: {
+    opacity: 0.85,
+  },
+  lockedCtaText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  forgotBtn: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  forgotText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: redesign.textSecondary,
   },
   keypadWrapper: {
     paddingHorizontal: redesign.pagePaddingX - 8,
