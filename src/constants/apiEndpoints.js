@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
     LOGOUT: '/api/auth/logout', // TODO: 백엔드 확정 필요
     REGISTER: '/api/auth/register', // TODO: 백엔드 확정 필요
     ME: '/api/auth/me', // TODO: 백엔드 확정 필요
+    CHECK_PHONE: null, // TODO: 백엔드 확정 필요 (로그인 전 전화번호 가입 여부 확인). null이면 'unavailable' 처리
   },
   ASSET: {
     ACCOUNTS: '/api/v1/assets/accounts', // TODO: 백엔드 확정 필요

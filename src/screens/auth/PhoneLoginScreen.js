@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { ROUTES } from '../../constants/routes';
 import { colors } from '../../theme';
 import { redesign } from '../../theme/redesign';
+import { checkPhoneRegistered, PHONE_CHECK_STATUS } from '../../features/auth/authApi';
 import {
   PHONE_NUMBER_ERROR_MESSAGE,
   PHONE_NUMBER_MAX_LENGTH,
@@ -21,23 +22,52 @@ import {
   validatePhoneNumber,
 } from '../../utils/authValidators';
 
+// 미가입 / 확인 API 미연결 / 네트워크·서버 오류 모두 같은 문구로 안내한다(형식 오류 문구와는 별개).
+const NOT_REGISTERED_MESSAGE = '가입되지 않은 전화번호예요.';
+
 const PhoneLoginScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [touched, setTouched] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+  const [checkErrorMsg, setCheckErrorMsg] = useState('');
+  const isCheckingRef = useRef(false);
 
-  const handlePhoneNumberChange = text => setPhoneNumber(sanitizePhoneNumber(text));
+  const handlePhoneNumberChange = text => {
+    setCheckErrorMsg('');
+    setPhoneNumber(sanitizePhoneNumber(text));
+  };
   const phoneNumberInvalid = touched && phoneNumber.length > 0 && !validatePhoneNumber(phoneNumber);
   const allValid = validatePhoneNumber(phoneNumber);
+  const ctaActive = allValid && !isChecking;
 
   const handleBack = () => navigation.popToTop();
 
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
 
-  const handleNext = () => {
+  // 형식 검사 통과 후 서버 가입 여부 확인 → registered일 때만 PIN 화면으로 이동한다.
+  const handleNext = async () => {
     setTouched(true);
-    if (!allValid) return;
-    navigation.navigate(ROUTES.PIN_INPUT, { mode: 'login', phoneNumber });
+    if (!allValid || isCheckingRef.current) return;
+
+    isCheckingRef.current = true;
+    setIsChecking(true);
+    setCheckErrorMsg('');
+    try {
+      const status = await checkPhoneRegistered({ phoneNumber });
+      if (status === PHONE_CHECK_STATUS.REGISTERED) {
+        navigation.navigate(ROUTES.PIN_INPUT, { mode: 'login', phoneNumber });
+      } else if (status === PHONE_CHECK_STATUS.UNREGISTERED) {
+        setCheckErrorMsg(NOT_REGISTERED_MESSAGE);
+      } else {
+        setCheckErrorMsg(NOT_REGISTERED_MESSAGE);
+      }
+    } catch {
+      setCheckErrorMsg(NOT_REGISTERED_MESSAGE);
+    } finally {
+      isCheckingRef.current = false;
+      setIsChecking(false);
+    }
   };
 
   return (
@@ -63,7 +93,15 @@ const PhoneLoginScreen = ({ navigation }) => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.headline}>{'로그인할\n휴대폰 번호를 입력해 주세요'}</Text>
+          <Text
+            style={styles.headline}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={1}
+          >
+            휴대폰 번호를 입력해 주세요
+          </Text>
           <Text style={styles.desc}>가입할 때 사용한 휴대폰 번호를 입력해 주세요.</Text>
 
           <View style={styles.fieldGroup}>
@@ -89,6 +127,7 @@ const PhoneLoginScreen = ({ navigation }) => {
             {phoneNumberInvalid && (
               <Text style={styles.errorText}>{PHONE_NUMBER_ERROR_MESSAGE}</Text>
             )}
+            {checkErrorMsg ? <Text style={styles.errorText}>{checkErrorMsg}</Text> : null}
           </View>
 
           <View style={styles.linkRow}>
@@ -102,17 +141,20 @@ const PhoneLoginScreen = ({ navigation }) => {
         <View style={styles.footer}>
           <TouchableOpacity
             onPress={handleNext}
-            disabled={!allValid}
-            activeOpacity={allValid ? 0.85 : 1}
-            style={[styles.submitBtn, allValid ? styles.submitBtnActive : styles.submitBtnDisabled]}
+            disabled={!ctaActive}
+            activeOpacity={ctaActive ? 0.85 : 1}
+            style={[
+              styles.submitBtn,
+              ctaActive ? styles.submitBtnActive : styles.submitBtnDisabled,
+            ]}
           >
             <Text
               style={[
                 styles.submitBtnText,
-                allValid ? styles.submitTextActive : styles.submitTextDisabled,
+                ctaActive ? styles.submitTextActive : styles.submitTextDisabled,
               ]}
             >
-              다음
+              {isChecking ? '확인 중...' : '다음'}
             </Text>
           </TouchableOpacity>
         </View>

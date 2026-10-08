@@ -26,6 +26,34 @@ function buildRegisterRequest({ phoneNumber, name, pin, termsRecords }) {
   return { phoneNumber, name, pin, termsRecords };
 }
 
+// 로그인 전 전화번호 가입 여부 확인 결과 상태.
+export const PHONE_CHECK_STATUS = {
+  REGISTERED: 'registered',
+  UNREGISTERED: 'unregistered',
+  UNAVAILABLE: 'unavailable', // 확인 API 미연결 — 가입 여부를 판단할 수 없음(registered 아님)
+};
+
+// 서버 응답 → 상태값 변환. 응답 형식이 아직 확정되지 않았으므로 이 함수만 실제 명세에 맞춰 수정한다.
+// TODO: 백엔드 응답 필드 확정 후 교체. 아래 `registered` boolean은 임시 가정일 뿐이다.
+// 명시적 boolean이 아니면 registered로 간주하지 않고 오류로 처리한다(계약이 불명확할 때 안전 실패).
+export function mapPhoneCheckResponse(data) {
+  if (data?.registered === true) return PHONE_CHECK_STATUS.REGISTERED;
+  if (data?.registered === false) return PHONE_CHECK_STATUS.UNREGISTERED;
+  throw new Error('가입 여부 확인 응답 형식을 해석할 수 없습니다.');
+}
+
+// 로그인 전 전화번호 가입 여부 확인. 반환: PHONE_CHECK_STATUS 값.
+// CHECK_PHONE endpoint가 없으면 요청 없이 UNAVAILABLE을 반환한다(가짜 성공/Mock 없음).
+// 네트워크·서버 오류는 잡지 않고 그대로 throw한다 — 호출 화면이 별도로 처리한다.
+export async function checkPhoneRegistered({ phoneNumber }) {
+  const endpoint = API_ENDPOINTS.AUTH.CHECK_PHONE;
+  if (!endpoint) return PHONE_CHECK_STATUS.UNAVAILABLE;
+
+  // TODO: 요청 방식(POST/GET)과 요청 데이터 형식은 백엔드 명세 확정 후 수정한다.
+  const data = await apiClient.post(endpoint, { phoneNumber });
+  return mapPhoneCheckResponse(data);
+}
+
 // credentials: { phoneNumber, pin } — 전화번호+PIN 로그인.
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
