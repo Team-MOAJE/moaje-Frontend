@@ -85,7 +85,11 @@ export const transferFunds = createAsyncThunk(
         idempotencyKey: safeIdempotencyKey,
       });
     } catch (error) {
-      return rejectWithValue(normalizeApiError(error, '송금에 실패했습니다.'));
+      // 같은 송금을 다시 시도할 때는 이 idempotencyKey를 그대로 다시 전달한다(새 송금은 키 생략).
+      return rejectWithValue({
+        ...normalizeApiError(error, '송금에 실패했습니다.'),
+        idempotencyKey: safeIdempotencyKey,
+      });
     }
   },
   {

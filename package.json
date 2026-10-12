@@ -8,7 +8,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:api": "node --import ./scripts/api-tests/loader.mjs --test scripts/api-tests/apiClient.test.mjs scripts/api-tests/authApi.test.mjs scripts/api-tests/authLogout.test.mjs scripts/api-tests/appLock.test.mjs scripts/api-tests/appLockRedux.test.mjs scripts/api-tests/appLockNavigation.test.mjs",
+    "test:api:smoke": "node --import ./scripts/api-tests/loader.mjs scripts/api-tests/smoke.mjs"
   },
   "dependencies": {
     "@expo/ui": "~57.0.18",

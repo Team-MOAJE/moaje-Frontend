@@ -16,8 +16,16 @@ import { redesign } from '../../../theme/redesign';
 // 실제 사용자가 체크박스로 동의해야 하는 항목만 구조화된 레코드로 관리한다.
 // "개인정보 처리방침"은 열람 전용 문서라 여기 포함하지 않는다(억지로 필수 동의화하지 않음).
 // 개인정보 보호법 제15조 제1항 제1호에 따른 회원가입 개인정보 수집·이용 동의(이름, 휴대전화번호).
+// 서비스 이용약관과 개인정보 수집·이용 동의는 별개 항목으로 각각 동의받는다.
+const SERVICE_TERMS_ID = 'signup-service-terms';
 const CONSENT_TERM_ID = 'signup-personal-info-consent';
 const TERMS_DEFINITIONS = [
+  {
+    termId: SERVICE_TERMS_ID,
+    type: 'service-terms',
+    version: 'v1',
+    required: true,
+  },
   {
     termId: CONSENT_TERM_ID,
     type: 'privacy-consent',
@@ -26,22 +34,85 @@ const TERMS_DEFINITIONS = [
   },
 ];
 
+// 서비스 이용약관 v1 본문 (출처: docs/MOAJE_서비스_이용약관_v1_초안.md)
+const SERVICE_TERMS_V1_ARTICLES = [
+  {
+    title: '제1조 (목적)',
+    body: '이 약관은 대학 졸업작품으로 제작된 MOAJE(모아제) 앱의 이용에 관한 기본 사항을 정합니다.',
+  },
+  {
+    title: '제2조 (서비스 내용)',
+    body: 'MOAJE는 모의 계좌·거래, 소비 내역 분석, 학사 일정 연계 지출 관리, 미래 자금 시뮬레이션 등의 시연 기능을 제공합니다. 서비스의 금융 관련 화면과 계산 결과는 학습·시연을 위한 것으로, 실제 금융기관의 계좌 개설이나 자금 이체, 금융상품 가입을 제공하지 않습니다.',
+  },
+  {
+    title: '제3조 (회원가입 및 계정 관리)',
+    body: '이용자는 본 약관과 별도의 개인정보 수집·이용 안내를 확인하고 각각 동의한 후 회원가입할 수 있습니다. 이용자는 다른 사람의 정보를 무단으로 사용해서는 안 되며, 자신의 로그인 PIN을 안전하게 관리해야 합니다.',
+  },
+  {
+    title: '제4조 (이용자의 준수사항)',
+    body: '이용자는 타인의 권리를 침해하거나, 허위 정보를 이용하거나, 서비스의 정상적인 운영을 방해하는 행위를 해서는 안 됩니다.',
+  },
+  {
+    title: '제5조 (서비스 변경 및 중단)',
+    body: 'MOAJE는 개발·시연·점검 과정에서 일부 기능을 변경하거나 일시 중단할 수 있습니다. 이용에 중대한 영향을 주는 변경이나 중단은 가능한 경우 앱 내 안내 등 적절한 방법으로 알립니다.',
+  },
+  {
+    title: '제6조 (안내 및 책임)',
+    body: '소비 분석과 재정 시뮬레이션 결과는 참고 정보이며 실제 재정 상태나 미래 결과를 보장하지 않습니다. 서비스 이용과 관련한 책임은 대한민국 관계 법령에 따릅니다.',
+  },
+  {
+    title: '제7조 (준거법)',
+    body: '이 약관에서 정하지 않은 사항은 대한민국 관계 법령에 따릅니다.',
+  },
+];
+
+const setTermConfirmed = (records, termId, confirmed) =>
+  records.map(t =>
+    t.termId === termId
+      ? { ...t, confirmed, confirmedAt: confirmed ? new Date().toISOString() : null }
+      : t
+  );
+
 const SignupTermsScreen = ({ navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
 
   const [termsRecords, setTermsRecords] = useState(
     TERMS_DEFINITIONS.map(def => ({ ...def, confirmed: false, confirmedAt: null }))
   );
+  const [serviceTermsModalVisible, setServiceTermsModalVisible] = useState(false);
+  const [serviceTermsModalChecked, setServiceTermsModalChecked] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [privacyModalChecked, setPrivacyModalChecked] = useState(false);
   const [privacyPolicyModalVisible, setPrivacyPolicyModalVisible] = useState(false);
 
+  const serviceTermsConfirmed =
+    termsRecords.find(t => t.termId === SERVICE_TERMS_ID)?.confirmed ?? false;
   const privacyNoticeConfirmed =
     termsRecords.find(t => t.termId === CONSENT_TERM_ID)?.confirmed ?? false;
 
   const allValid = termsRecords.filter(t => t.required).every(t => t.confirmed);
 
   const handleBack = () => navigation.popToTop();
+
+  const handleOpenServiceTermsModal = () => {
+    setServiceTermsModalChecked(serviceTermsConfirmed);
+    setServiceTermsModalVisible(true);
+  };
+  const handleCloseServiceTermsModal = () => setServiceTermsModalVisible(false);
+
+  const handlePressServiceTermsCheckbox = () => {
+    if (serviceTermsConfirmed) {
+      setTermsRecords(records => setTermConfirmed(records, SERVICE_TERMS_ID, false));
+    } else {
+      handleOpenServiceTermsModal();
+    }
+  };
+
+  const handleConfirmServiceTerms = () => {
+    if (!serviceTermsModalChecked) return;
+    setTermsRecords(records => setTermConfirmed(records, SERVICE_TERMS_ID, true));
+    setServiceTermsModalVisible(false);
+  };
 
   const handleOpenPrivacyModal = () => {
     setPrivacyModalChecked(privacyNoticeConfirmed);
@@ -51,11 +122,7 @@ const SignupTermsScreen = ({ navigation }) => {
 
   const handlePressPrivacyCheckbox = () => {
     if (privacyNoticeConfirmed) {
-      setTermsRecords(records =>
-        records.map(t =>
-          t.termId === CONSENT_TERM_ID ? { ...t, confirmed: false, confirmedAt: null } : t
-        )
-      );
+      setTermsRecords(records => setTermConfirmed(records, CONSENT_TERM_ID, false));
     } else {
       handleOpenPrivacyModal();
     }
@@ -63,13 +130,7 @@ const SignupTermsScreen = ({ navigation }) => {
 
   const handleConfirmPrivacyNotice = () => {
     if (!privacyModalChecked) return;
-    setTermsRecords(records =>
-      records.map(t =>
-        t.termId === CONSENT_TERM_ID
-          ? { ...t, confirmed: true, confirmedAt: new Date().toISOString() }
-          : t
-      )
-    );
+    setTermsRecords(records => setTermConfirmed(records, CONSENT_TERM_ID, true));
     setPrivacyModalVisible(false);
   };
 
@@ -108,6 +169,26 @@ const SignupTermsScreen = ({ navigation }) => {
         <View style={styles.termsSection}>
           <View style={styles.termItemRow}>
             <TouchableOpacity
+              onPress={handlePressServiceTermsCheckbox}
+              activeOpacity={0.7}
+              style={styles.termCheckRow}
+            >
+              <View style={[styles.checkbox, serviceTermsConfirmed && styles.checkboxChecked]}>
+                {serviceTermsConfirmed && <Feather name="check" size={14} color="#FFFFFF" />}
+              </View>
+              <Text style={styles.termItemText}>서비스 이용약관 동의 (필수)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleOpenServiceTermsModal}
+              activeOpacity={0.6}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.privacyNoticeButtonText}>자세히 보기</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.termItemRow}>
+            <TouchableOpacity
               onPress={handlePressPrivacyCheckbox}
               activeOpacity={0.7}
               style={styles.termCheckRow}
@@ -122,7 +203,7 @@ const SignupTermsScreen = ({ navigation }) => {
               activeOpacity={0.6}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.privacyNoticeButtonText}>내용 보기</Text>
+              <Text style={styles.privacyNoticeButtonText}>자세히 보기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -154,6 +235,81 @@ const SignupTermsScreen = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* 서비스 이용약관 동의 모달 (필수 동의, v1) */}
+      <Modal
+        visible={serviceTermsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseServiceTermsModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>서비스 이용약관 동의 (필수)</Text>
+              <TouchableOpacity
+                onPress={handleCloseServiceTermsModal}
+                activeOpacity={0.7}
+                style={styles.modalCloseIconBtn}
+              >
+                <Feather name="x" size={20} color={redesign.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={[styles.modalBody, { maxHeight: windowHeight * 0.5 }]}
+              contentContainerStyle={styles.modalBodyContent}
+            >
+              {SERVICE_TERMS_V1_ARTICLES.map((article, index) => (
+                <React.Fragment key={article.title}>
+                  <Text style={[styles.modalSectionTitle, index === 0 && styles.modalFirstTitle]}>
+                    {article.title}
+                  </Text>
+                  <Text style={styles.modalParagraph}>{article.body}</Text>
+                </React.Fragment>
+              ))}
+
+              <View style={styles.modalCheckRow}>
+                <TouchableOpacity
+                  onPress={() => setServiceTermsModalChecked(c => !c)}
+                  activeOpacity={0.85}
+                  style={styles.termCheckRow}
+                >
+                  <View
+                    style={[styles.checkbox, serviceTermsModalChecked && styles.checkboxChecked]}
+                  >
+                    {serviceTermsModalChecked && <Feather name="check" size={14} color="#FFFFFF" />}
+                  </View>
+                  <Text style={styles.modalCheckText}>위 서비스 이용약관에 동의합니다.</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={handleConfirmServiceTerms}
+              disabled={!serviceTermsModalChecked}
+              activeOpacity={serviceTermsModalChecked ? 0.85 : 1}
+              style={[
+                styles.modalConfirmBtn,
+                serviceTermsModalChecked
+                  ? styles.modalConfirmBtnActive
+                  : styles.modalConfirmBtnDisabled,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.modalConfirmBtnText,
+                  serviceTermsModalChecked
+                    ? styles.modalConfirmTextActive
+                    : styles.modalConfirmTextDisabled,
+                ]}
+              >
+                동의하기
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 개인정보 수집·이용 동의 모달 (개인정보 보호법 제15조 제1항 제1호, 필수 동의) */}
       <Modal
@@ -429,6 +585,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: redesign.divider,
     paddingVertical: 18,
+    gap: 18,
   },
   termItemRow: {
     flexDirection: 'row',
@@ -547,6 +704,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: redesign.textPrimary,
+  },
+  modalFirstTitle: {
+    marginTop: 0,
   },
   modalMainSectionTitle: {
     marginTop: 20,

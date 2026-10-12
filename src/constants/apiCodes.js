@@ -10,6 +10,12 @@ export const API_CODES = {
   AUTH_ACCOUNT_LOCKED: 'AUTH-403-001',
   AUTH_MFA_REQUIRED: 'AUTH-403-002',
 
+  // 2026-10-12 실행 중 Auth 컨테이너 소스로 확인(실요청 검증 전).
+  // 로그인 시 미가입 번호와 PIN 불일치는 서버가 같은 코드로 응답한다.
+  AUTH_LOGIN_INVALID_CREDENTIALS: 'AUTH-422-001',
+  // PIN 5회 연속 실패 → 30분 로그인 제한
+  AUTH_PIN_LOCKED: 'AUTH-423-001',
+
   // Asset
   ASSET_ACCOUNT_NOT_FOUND: 'ASSET-404-001',
   ASSET_INSUFFICIENT_BALANCE: 'ASSET-400-001',

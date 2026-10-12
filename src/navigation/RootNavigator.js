@@ -44,12 +44,13 @@ const DevPreviewNavigator = () => (
 
 const LockStack = createNativeStackNavigator();
 
-// 세션(토큰)은 유효하지만 App Lock PIN 잠금 해제가 필요한 상태. PIN_INPUT 화면 1개만 등록한다.
+// 세션(토큰)은 유효하지만 App Lock PIN 잠금 해제가 필요한 상태. PinInputScreen 1개만 등록한다.
+// route 이름은 AuthNavigator/MainNavigator와 겹치지 않는 APP_LOCK_PIN을 쓴다(상태 이어받기 방지).
 // isAppLockFeatureEnabled가 false인 동안(현재)은 RootNavigator가 이 트리로 진입시키지 않는다.
 const AppLockStack = () => (
   <LockStack.Navigator screenOptions={{ headerShown: false }}>
     <LockStack.Screen
-      name={ROUTES.PIN_INPUT}
+      name={ROUTES.APP_LOCK_PIN}
       component={PinInputScreen}
       initialParams={{ mode: 'unlock' }}
     />

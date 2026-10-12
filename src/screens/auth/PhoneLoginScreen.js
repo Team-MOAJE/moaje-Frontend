@@ -22,7 +22,7 @@ import {
   validatePhoneNumber,
 } from '../../utils/authValidators';
 
-// 미가입 / 확인 API 미연결 / 네트워크·서버 오류 모두 같은 문구로 안내한다(형식 오류 문구와는 별개).
+// 가입 여부 확인 API가 생겨 미가입·확인 실패로 응답한 경우의 안내 문구(형식 오류 문구와는 별개).
 const NOT_REGISTERED_MESSAGE = '가입되지 않은 전화번호예요.';
 
 const PhoneLoginScreen = ({ navigation }) => {
@@ -45,7 +45,8 @@ const PhoneLoginScreen = ({ navigation }) => {
 
   const handleSignup = () => navigation.navigate(ROUTES.SIGNUP);
 
-  // 형식 검사 통과 후 서버 가입 여부 확인 → registered일 때만 PIN 화면으로 이동한다.
+  // 형식 검사 통과 후 PIN 화면으로 이동한다. 서버에 가입 여부 확인 API가 없으므로(UNAVAILABLE)
+  // 가입 여부·PIN 일치는 POST /api/v1/auth/login 응답으로 판단한다.
   const handleNext = async () => {
     setTouched(true);
     if (!allValid || isCheckingRef.current) return;
@@ -55,10 +56,8 @@ const PhoneLoginScreen = ({ navigation }) => {
     setCheckErrorMsg('');
     try {
       const status = await checkPhoneRegistered({ phoneNumber });
-      if (status === PHONE_CHECK_STATUS.REGISTERED) {
+      if (status === PHONE_CHECK_STATUS.REGISTERED || status === PHONE_CHECK_STATUS.UNAVAILABLE) {
         navigation.navigate(ROUTES.PIN_INPUT, { mode: 'login', phoneNumber });
-      } else if (status === PHONE_CHECK_STATUS.UNREGISTERED) {
-        setCheckErrorMsg(NOT_REGISTERED_MESSAGE);
       } else {
         setCheckErrorMsg(NOT_REGISTERED_MESSAGE);
       }
