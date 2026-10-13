@@ -7,6 +7,8 @@ import { ROUTES } from '../../constants/routes';
 import CategoryListItem from '../../components/category/CategoryListItem';
 import BottomNavBar from '../../components/home/BottomNavBar';
 import { getOnboardingRepository } from '../../features/onboarding/onboardingRepository';
+import { WORK_ONBOARDING_ENABLED } from '../../features/onboarding/workOnboardingConfig';
+import { resolveFinancialOnboardingEntry } from '../../navigation/workOnboardingRouteLogic';
 
 // 실제 라우트가 아니라 handleItemPress 안에서만 분기하는 sentinel — ROUTES 값과 겹치지 않는다.
 const FINANCIAL_ONBOARDING_ACTION = 'financialOnboardingEntry';
@@ -15,6 +17,7 @@ const FINANCE_ITEMS = [
   { title: '송금하기', desc: '토큰 기반 안전 송금', routeAction: ROUTES.TRANSFER },
   { title: '거래내역', desc: '수입과 지출 흐름 확인', routeAction: ROUTES.TRANSACTION_HISTORY },
   { title: '생활비 분석', desc: '지출 패턴과 고정비 분석', routeAction: ROUTES.DAILY_LIMIT },
+  { title: '머니 리캡', desc: '월별 소비 요약과 인사이트', routeAction: ROUTES.MONEY_RECAP },
 ];
 
 const MY_INFO_ITEMS = [
@@ -28,12 +31,30 @@ const ONBOARDING_ITEMS = [
     desc: '검사 결과 확인 및 재검사',
     routeAction: FINANCIAL_ONBOARDING_ACTION,
   },
+  {
+    title: '사회인 준비도',
+    desc: '목표 대비 내 준비 상태 확인',
+    routeAction: ROUTES.WORK_READINESS,
+  },
+  {
+    title: '미래 자금 시뮬레이션',
+    desc: '목표 자금 달성 시점과 지출 조정 비교',
+    routeAction: ROUTES.WORK_SIMULATOR,
+  },
 ];
 
 export default function CategoryScreen({ navigation }) {
   const user = useSelector(state => state.auth.user);
 
   const handleFinancialOnboardingPress = async () => {
+    // 서버 온보딩(기능 플래그 on): 서버 상태를 추정하지 않고 결과 화면으로 이동한다(결과 화면이 서버 조회 결과로
+    // 시작/재검사/홈 버튼을 결정). 기존 로컬 Draft/결과는 읽지 않는다. 플래그 off는 아래 기존 로직 그대로.
+    const entry = resolveFinancialOnboardingEntry({ flagEnabled: WORK_ONBOARDING_ENABLED });
+    if (entry.kind === 'server_result') {
+      navigation.dispatch(entry.action);
+      return;
+    }
+
     const repository = getOnboardingRepository(user?.userId ?? 'guest');
     const [draft, result] = await Promise.all([repository.loadDraft(), repository.loadResult()]);
 

@@ -38,5 +38,22 @@ export const API_ENDPOINTS = {
   WORK: {
     DAILY_LIMIT: '/api/v1/work/daily-limit', // TODO: 백엔드 확정 필요
     RECOMMENDATIONS: '/api/v1/work/recommendations', // TODO: 백엔드 확정 필요
+    // 재무 온보딩. userId는 호출 전에 onboardingApi.js가 검증한 숫자 문자열만 전달한다.
+    ONBOARDING: {
+      QUESTIONS: '/api/v1/work/onboarding/questions', // 명세 확정 (API-30)
+      ANSWERS: userId => `/api/v1/work/onboarding/${userId}/answers`, // 명세 확정 (API-31 POST / API-33 GET)
+      ANSWER: (userId, questionNo) => `/api/v1/work/onboarding/${userId}/answers/${questionNo}`, // 명세 확정 (API-32)
+      PROGRESS: userId => `/api/v1/work/onboarding/${userId}/progress`, // 명세 확정 (API-34)
+      PROFILE: userId => `/api/v1/work/onboarding/${userId}/profile`, // 명세 확정 (API-35)
+    },
+    // 사회인 준비도. userId는 readinessApi.js가 검증한 숫자 문자열만 전달한다.
+    READINESS: userId => `/api/v1/work/readiness/${userId}`, // 명세 확정 (API-36)
+    // Money Recap. userId/yearMonth는 recapApi.js가 검증한 값만 전달한다.
+    RECAP_MONTHS: userId => `/api/v1/work/recap/${userId}/months`, // 명세 확정 (API-37)
+    RECAP: (userId, yearMonth) => `/api/v1/work/recap/${userId}/${yearMonth}`, // 명세 확정 (API-38)
+    // 미래 자금 시뮬레이션. userId는 simulatorApi.js가 검증한 숫자 문자열만 전달한다.
+    SIMULATOR_BASELINES: '/api/v1/work/simulator/baselines', // 명세 확정 (API-39, user_id 없음)
+    SIMULATE: userId => `/api/v1/work/simulator/${userId}/simulate`, // 명세 확정 (API-40)
+    ADJUST: userId => `/api/v1/work/simulator/${userId}/adjust`, // 명세 확정 (API-41)
   },
 };

@@ -30,6 +30,17 @@ export const ROUTES = {
   FINANCIAL_ONBOARDING: 'FinancialOnboarding',
   FINANCIAL_ONBOARDING_RESULT: 'FinancialOnboardingResult',
 
+  // 서버(Work API) 기반 재무 온보딩. 값은 workOnboardingNavigation.js의 WORK_ONBOARDING_ROUTES와 같아야 한다.
+  // 기능 플래그(WORK_ONBOARDING_ENABLED)가 true일 때만 Navigator에 등록된다.
+  WORK_FINANCIAL_ONBOARDING: 'WorkFinancialOnboarding',
+  WORK_FINANCIAL_ONBOARDING_RESULT: 'WorkFinancialOnboardingResult',
+
+  // 사회인 준비도(API-36). 온보딩 기능 플래그와 무관하게 항상 등록된다.
+  WORK_READINESS: 'WorkReadiness',
+
+  // 미래 자금 시뮬레이션(API-39~41). 기능 플래그와 무관하게 항상 등록된다.
+  WORK_SIMULATOR: 'WorkSimulator',
+
   // 공통 상태 화면
   STATUS_SPLASH_LOADING: 'StatusSplashLoading',
   STATUS_DATA_LOADING: 'StatusDataLoading',

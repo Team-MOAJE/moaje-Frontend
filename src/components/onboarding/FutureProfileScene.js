@@ -3,6 +3,7 @@ import { View, Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { colors, radius, shadows } from '../../theme';
+import { Leaf, Orb } from './FutureProfileDecor';
 import {
   FUTURE_PROFILE_IMAGE_ADJUST,
   FUTURE_PROFILE_IMAGE_DEFAULT_ADJUST,

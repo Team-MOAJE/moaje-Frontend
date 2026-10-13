@@ -7,6 +7,7 @@ import HomeSafeAmountSection from '../../components/home/HomeSafeAmountSection';
 import HomeMiniTabs from '../../components/home/HomeMiniTabs';
 import HomeAccountTab from '../../components/home/HomeAccountTab';
 import HomeMoneyTypeTab from '../../components/home/HomeMoneyTypeTab';
+import HomeFutureProfileGuide from '../../components/home/HomeFutureProfileGuide';
 import BottomNavBar from '../../components/home/BottomNavBar';
 import { redesign } from '../../theme';
 import { ROUTES } from '../../constants/routes';
@@ -14,6 +15,8 @@ import { fetchAccounts } from '../../features/asset/assetApi';
 import { fetchDailyLimit } from '../../features/work/workApi';
 import { getOnboardingRepository } from '../../features/onboarding/onboardingRepository';
 import { buildFinancialOnboardingResultViewModel } from '../../features/onboarding/buildFinancialOnboardingResultViewModel';
+import { WORK_ONBOARDING_ENABLED } from '../../features/onboarding/workOnboardingConfig';
+import { resolveHomeMoneyTypeView } from '../../features/onboarding/workOnboardingNavigation';
 
 // 실제 데이터 소스가 있는 탭만 노출한다. (거래내역 요약/생활비 분석은 연동 API가 생기면 추가)
 const HOME_TABS = [
@@ -46,6 +49,8 @@ export default function HomeScreen({ navigation }) {
   }, [dispatch]);
 
   useEffect(() => {
+    // 서버 온보딩(기능 플래그 on)에서는 기존 로컬 머니 타입을 읽지도 계산하지도 않는다(서버 결과와 혼합 금지).
+    if (WORK_ONBOARDING_ENABLED) return undefined;
     let cancelled = false;
     const loadMoneyType = async () => {
       try {
@@ -84,7 +89,16 @@ export default function HomeScreen({ navigation }) {
   const handleWhyPress = () => navigation.navigate(ROUTES.DAILY_LIMIT);
   const handleAccountPress = () => navigation.navigate(ROUTES.ACCOUNT_DETAIL);
   const handleConnectAccountPress = () => {};
-  const handleFutureProfilePress = () => navigation.navigate(ROUTES.FINANCIAL_ONBOARDING_RESULT);
+  const moneyTypeView = resolveHomeMoneyTypeView({ flagEnabled: WORK_ONBOARDING_ENABLED });
+  const handleFutureProfilePress = () =>
+    navigation.navigate(
+      WORK_ONBOARDING_ENABLED
+        ? ROUTES.WORK_FINANCIAL_ONBOARDING_RESULT
+        : ROUTES.FINANCIAL_ONBOARDING_RESULT
+    );
+  const handleServerGuidePress = () => {
+    if (moneyTypeView.kind === 'server_guide') navigation.dispatch(moneyTypeView.action);
+  };
   const handleBottomHomePress = () => {};
   const handleBottomTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
   const handleBottomCategoryPress = () => navigation.navigate(ROUTES.CATEGORY);
@@ -92,6 +106,16 @@ export default function HomeScreen({ navigation }) {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'moneyType':
+        if (moneyTypeView.kind === 'server_guide') {
+          return (
+            <HomeFutureProfileGuide
+              title={moneyTypeView.title}
+              message={moneyTypeView.message}
+              ctaLabel={moneyTypeView.ctaLabel}
+              onPress={handleServerGuidePress}
+            />
+          );
+        }
         return (
           <HomeMoneyTypeTab profile={moneyTypeProfile} onDetailPress={handleFutureProfilePress} />
         );

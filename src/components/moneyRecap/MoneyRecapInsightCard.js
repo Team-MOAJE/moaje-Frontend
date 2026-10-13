@@ -2,12 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { redesign } from '../../theme/redesign';
 
-// 카드/아이콘 박스 없이 제목 + 본문만 보여주는 flat 인사이트 행.
+// 카드/아이콘 박스 없이 제목 + 본문만 보여주는 flat 인사이트 행. title이 없으면 본문만 그린다.
 export default function MoneyRecapInsightCard({ title, body }) {
   return (
     <View style={styles.row}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.body}>{body}</Text>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
+      <Text style={[styles.body, title ? styles.bodyWithTitle : null]}>{body}</Text>
     </View>
   );
 }
@@ -19,5 +19,6 @@ const styles = StyleSheet.create({
     borderBottomColor: redesign.divider,
   },
   title: { fontSize: 16, fontWeight: '700', color: redesign.textPrimary },
-  body: { fontSize: 14, lineHeight: 22, color: redesign.textSecondary, marginTop: 6 },
+  body: { fontSize: 14, lineHeight: 22, color: redesign.textSecondary },
+  bodyWithTitle: { marginTop: 6 },
 });
