@@ -93,6 +93,12 @@ const buildInitialState = () => ({
   transactionDetailError: null,
   transactionDetailRequestId: null,
 
+  // 송금 COMPLETED 직후의 데이터 신선도. 서버 응답으로 확인되기 전의 잔액은 최신으로 취급하지 않는다.
+  // - accountDataVersion: 계좌 범위 데이터(상세·거래)를 비우고 다시 조회해야 할 때마다 증가한다(화면 재조회 트리거).
+  // - staleBalanceAccountIds: 송금 이후 서버 잔액을 아직 확인하지 못한 계좌 id. accounts 자체는 지우지 않는다.
+  accountDataVersion: 0,
+  staleBalanceAccountIds: [],
+
   // API-10 송금
   transferLoading: false,
   transferError: null,
@@ -198,6 +204,18 @@ const assetSlice = createSlice({
       state.selectedAccountId = nextId;
       clearAccountScopedState(state);
     },
+    // 송금 COMPLETED 확정 직후 호출한다. 서버에서 다시 받기 전까지 이전 잔액·상세·거래를 최신으로 보이지 않게 한다.
+    // 잔액을 계산하거나 바꾸지 않고, accounts·선택 계좌·송금 상태(pendingTransfer 등)는 건드리지 않는다.
+    accountDataInvalidated: state => {
+      clearAccountScopedState(state); // 상세/거래 비움 + API-11/API-13 진행 중 요청 무효화
+      state.refreshingAccountId = null; // 진행 중이던 API-14의 늦은 응답 무시
+      state.refreshRequestId = null;
+      state.refreshError = null;
+      state.accountsRequestId = null; // 송금 이전에 시작된 API-52 응답은 최신 확인으로 인정하지 않는다
+      state.accountsLoading = false;
+      state.staleBalanceAccountIds = state.accounts.map(account => account.id);
+      state.accountDataVersion += 1;
+    },
     clearTransactionDetail: state => {
       state.transactionDetail = null;
       state.transactionDetailAccountId = null;
@@ -270,6 +288,7 @@ const assetSlice = createSlice({
         state.accounts = normalizeAccountList(action.payload?.accounts);
         state.accountsLoading = false;
         state.accountsRequestId = null;
+        state.staleBalanceAccountIds = []; // 무효화 이후 시작된 최신 요청의 서버 잔액
 
         // 선택 보정: 있으면 유지(SUSPENDED/CLOSED 조회 포함), 사라졌으면 기본 ACTIVE 계좌, 없으면 null
         const nextId = resolveSelectedAccountId(state.accounts, state.selectedAccountId);
@@ -304,6 +323,17 @@ const assetSlice = createSlice({
         state.accountDetailAccountId = accountId;
         state.accountDetailLoading = false;
         state.accountDetailRequestId = null;
+        // 송금 후 잔액 확인 대기 중이던 계좌는 서버(API-11) 잔액을 목록에도 반영하고 확인 완료로 본다.
+        if (state.staleBalanceAccountIds.includes(accountId)) {
+          const target = state.accounts.find(account => account.id === accountId);
+          if (target) {
+            target.balance = state.accountDetail.balance;
+            target.balanceExact = state.accountDetail.balanceExact;
+          }
+          state.staleBalanceAccountIds = state.staleBalanceAccountIds.filter(
+            id => id !== accountId
+          );
+        }
       })
       .addCase(fetchAccountDetail.rejected, (state, action) => {
         if (!isCurrentRequest(state.accountDetailRequestId, action)) return;
@@ -335,6 +365,7 @@ const assetSlice = createSlice({
           target.syncStatus = normalized.syncStatus;
           target.lastSyncedAt = normalized.lastSyncedAt;
         }
+        state.staleBalanceAccountIds = state.staleBalanceAccountIds.filter(id => id !== accountId);
         // 상세는 지금 선택된 계좌일 때만 교체한다.
         if (accountId === state.selectedAccountId) {
           state.accountDetail = normalized;
@@ -626,6 +657,7 @@ export const {
   clearTransactionDetail,
   resetTransactions,
   beginTransactionsRefresh,
+  accountDataInvalidated,
   setCashflowYearMonth,
 } = assetSlice.actions;
 export default assetSlice.reducer;

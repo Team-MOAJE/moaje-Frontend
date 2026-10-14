@@ -69,6 +69,7 @@ export default function HomeScreen({ navigation }) {
   const accounts = useSelector(state => state.asset.accounts);
   const accountsLoading = useSelector(state => state.asset.accountsLoading);
   const accountsError = useSelector(state => state.asset.accountsError);
+  const staleBalanceAccountIds = useSelector(state => state.asset.staleBalanceAccountIds);
   // API-15 서버 계산 결과. 사용자가 오늘의 가용금액 화면에서 입력해 계산했을 때만 있다(홈이 입력 없이 자동 호출하지 않는다).
   const dailyLimit = useSelector(state => state.asset.cashflowDaily.result);
   const dailyLimitMeta = useSelector(state => state.asset.dailyLimitMeta);
@@ -194,7 +195,10 @@ export default function HomeScreen({ navigation }) {
   }, [activeTab, currentYearMonth, cashflowYearMonth, cashflowMonthly, cashflowCategory]);
 
   // 서버에 총잔액 API가 없으므로 계좌 잔액을 합산하지 않는다(null·부정확 잔액이 0원으로 섞이는 것도 방지).
-  const accountItems = useMemo(() => buildHomeAccountItems(accounts), [accounts]);
+  const accountItems = useMemo(
+    () => buildHomeAccountItems(accounts, staleBalanceAccountIds),
+    [accounts, staleBalanceAccountIds]
+  );
   const accountsState = resolveHomeAccountsState({
     accounts,
     loading: accountsLoading,

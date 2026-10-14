@@ -1,5 +1,5 @@
 // Banking API 통신 레이어 (API-09 Mock 계좌 개설, API-10 송금 요청).
-// 기준: docs/moaje-frontend-api-guide-20261011.pdf, 백엔드 moaje-banking 소스(AccountController, TransferController 읽기 확인).
+// 기준: docs/moaje-frontend-api-guide-20261011(최신화).pdf(20261014 반영), 백엔드 moaje-banking 소스(AccountController, TransferController 읽기 확인).
 //
 // 이 모듈은 HTTP 호출·요청 본문 구성·응답 검증/변환만 담당한다. 화면/Redux를 알지 못한다.
 //
@@ -11,7 +11,7 @@
 //   새 송금은 새 키를 쓴다. apiClient가 요청 시작 시 키를 config에 고정하므로 내부 refresh 재전송에서도 키가 유지된다.
 //   이 모듈은 네트워크 오류에도 자동 재실행하지 않는다. 호출부는 응답 status(ACCEPTED/PROCESSING/COMPLETED/FAILED/REVERSED)를
 //   구분해 처리해야 하며, 응답을 받았다는 사실만으로 송금 성공으로 취급하지 않는다.
-// - withdrawalAccountId는 TSID Long이라 검증된 숫자 문자열을 JSON 숫자 리터럴 원문으로 본문에 넣는다(Number 변환 금지).
+// - withdrawalAccountId는 TSID Long이며 최신 명세(20261014)부터 JSON 문자열로 보낸다(Number 변환 금지).
 // - 금액은 원 단위 양의 정수(JSON 숫자). currency 기본값은 서버와 같은 'KRW'이다.
 import apiClient from '../../services/apiClient';
 import { API_ENDPOINTS } from '../../constants/apiEndpoints';
@@ -20,6 +20,7 @@ import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
 import {
   ASSET_REQUEST_ERROR,
   ASSET_REQUEST_OPTIONS,
+  isAccountNumber,
   isDateTimeString,
   isNonEmptyString,
   isNonNegativeSafeInteger,
@@ -58,6 +59,9 @@ export const mapOpenAccountResponse = body => {
     accountId: requireId(body, 'accountId', field),
     userId: requireField(body, 'userId', isNonEmptyString, field),
     bankCode: requireField(body, 'bankCode', isNonEmptyString, field),
+    bankName: optionalField(body, 'bankName', isString, field),
+    // 개설된 실제 계좌번호(14자리 숫자 문자열, 최신 서버 필수). 로그·오류 메시지에 값을 넣지 않는다.
+    accountNumber: requireField(body, 'accountNumber', isAccountNumber, field),
     productName: requireField(body, 'productName', isNonEmptyString, field),
     balance: requireField(body, 'balance', isNonNegativeSafeInteger, field),
     status: requireField(body, 'status', oneOf(Object.values(BANKING_ACCOUNT_STATUS)), field),
@@ -92,16 +96,26 @@ const requireNonEmpty = (value, name) => {
   return value;
 };
 
-// API-09 요청 본문(JSON 문자열). 입력: { ci, userName, phoneNumber, bankCode, productName, initialBalance }.
-// 오류 메시지에는 입력 값을 넣지 않는다(개인정보).
+const MAX_BANK_CODE_LENGTH = 20;
+const MAX_BANK_NAME_LENGTH = 100;
+
+// API-09 요청 본문(JSON 문자열). 입력: { ci, userName, phoneNumber, bankCode, bankName, productName, initialBalance }.
+// bankName은 최신 명세(20261014)에서 필수다(≤100자, bankCode ≤20자). 오류 메시지에는 입력 값을 넣지 않는다(개인정보).
 export const buildOpenAccountRequestBody = input => {
   requireInputObject(input, '계좌 개설');
-  const { ci, userName, phoneNumber, bankCode, productName, initialBalance } = input;
+  const { ci, userName, phoneNumber, bankCode, bankName, productName, initialBalance } = input;
 
   requireNonEmpty(ci, 'ci');
   requireNonEmpty(userName, 'userName');
   requireNonEmpty(phoneNumber, 'phoneNumber');
   requireNonEmpty(bankCode, 'bankCode');
+  requireNonEmpty(bankName, 'bankName');
+  if (bankCode.length > MAX_BANK_CODE_LENGTH || bankName.length > MAX_BANK_NAME_LENGTH) {
+    throw requestError(
+      ASSET_REQUEST_ERROR.INVALID_INPUT,
+      'bankCode는 20자, bankName은 100자 이하여야 합니다.'
+    );
+  }
   requireNonEmpty(productName, 'productName');
   if (!isNonNegativeSafeInteger(initialBalance)) {
     throw requestError(
@@ -110,11 +124,19 @@ export const buildOpenAccountRequestBody = input => {
     );
   }
 
-  return JSON.stringify({ ci, userName, phoneNumber, bankCode, productName, initialBalance });
+  return JSON.stringify({
+    ci,
+    userName,
+    phoneNumber,
+    bankCode,
+    bankName,
+    productName,
+    initialBalance,
+  });
 };
 
 // API-10 요청 본문(JSON 문자열). 입력: { withdrawalAccountId(숫자 문자열), depositBankCode, depositAccountNumber, amount, currency? }.
-// withdrawalAccountId는 검증된 숫자 문자열을 숫자 리터럴 원문으로 이어 붙인다(숫자만 통과하므로 주입 불가).
+// 은행명·메모 등 명세에 없는 필드는 보내지 않는다.
 export const buildTransferRequestBody = input => {
   requireInputObject(input, '송금');
   const { withdrawalAccountId, depositBankCode, depositAccountNumber, amount } = input;
@@ -131,8 +153,14 @@ export const buildTransferRequestBody = input => {
     );
   }
 
-  const rest = JSON.stringify({ depositBankCode, depositAccountNumber, amount, currency }).slice(1);
-  return `{"withdrawalAccountId":${withdrawalAccountId},${rest}`;
+  // 최신 명세(20261014): withdrawalAccountId는 JSON 문자열. 검증된 숫자 문자열을 Number 변환 없이 그대로 담는다.
+  return JSON.stringify({
+    withdrawalAccountId,
+    depositBankCode,
+    depositAccountNumber,
+    amount,
+    currency,
+  });
 };
 
 // ── API 함수 ─────────────────────────────────────────────────

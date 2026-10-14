@@ -147,6 +147,7 @@ test('홈 행 모델: 0개/1개/여러 개 라벨, 상태 배지, 잔액 "-", �
   assert.deepEqual(one[0], {
     id: '1',
     label: '내 계좌',
+    maskedAccountNumber: null,
     status: 'ACTIVE',
     statusLabel: null,
     balanceText: '10,000원',

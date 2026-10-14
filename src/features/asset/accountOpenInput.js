@@ -9,9 +9,10 @@
 // 이 값은 시연용 Mock 식별값이며 실제 본인인증 CI가 아니다. 사용자 이름·전화번호는 Auth에 저장된 값만 쓰고 만들어 내지 않는다.
 import { isValidOnboardingUserId } from '../onboarding/onboardingApi';
 import { isNonEmptyString, isNonNegativeSafeInteger } from './assetResponse';
+import { getVirtualBankByCode } from './virtualBanks';
 
 export const DEMO_CI_PREFIX = 'MOAJE-DEMO-';
-// 서버에 허용 목록이 없고, 문서·e2e 관례 값 "001"을 쓴다. 은행 이름은 서버에 없으므로 만들지 않는다.
+// 기본 시연 은행 코드("001" 카카오뱅크). 은행 선택 목록은 virtualBanks.js가 단일 출처다.
 export const DEMO_BANK_CODE = '001';
 export const DEMO_PRODUCT_NAME = 'MOAJE 입출금';
 export const MAX_DEMO_INITIAL_BALANCE = 100000000; // 입력 실수 방지용 상한(서버 제한 아님)
@@ -20,6 +21,7 @@ export const OPEN_ACCOUNT_BLOCK_REASON = Object.freeze({
   USER_ID: 'USER_ID', // 로그인 사용자 id 없음/형식 오류
   USER_NAME: 'USER_NAME', // 저장된 이름 없음
   PHONE_NUMBER: 'PHONE_NUMBER', // 저장된 전화번호 없음
+  BANK: 'BANK', // 은행 미선택/목록에 없는 은행
   INITIAL_BALANCE: 'INITIAL_BALANCE', // 초기 잔액 입력 오류
 });
 
@@ -27,8 +29,9 @@ export const OPEN_ACCOUNT_BLOCK_REASON = Object.freeze({
 export const buildDemoCi = userId =>
   isValidOnboardingUserId(userId) ? `${DEMO_CI_PREFIX}${userId}` : null;
 
-// 입력: { user: auth.user, initialBalance }. 반환: { ok: true, input } | { ok: false, reason }.
-export const buildOpenAccountInput = ({ user, initialBalance } = {}) => {
+// 입력: { user: auth.user, initialBalance, bank: { bankCode } | null }. bank는 virtualBanks 목록의 은행이어야 하며
+// bankName은 호출부가 보낸 값이 아니라 목록에서 가져온다(API-09는 bankCode+bankName 필수). 반환: { ok: true, input } | { ok: false, reason }.
+export const buildOpenAccountInput = ({ user, initialBalance, bank } = {}) => {
   const ci = buildDemoCi(user?.userId);
   if (ci === null) return { ok: false, reason: OPEN_ACCOUNT_BLOCK_REASON.USER_ID };
   if (!isNonEmptyString(user?.name))
@@ -36,6 +39,8 @@ export const buildOpenAccountInput = ({ user, initialBalance } = {}) => {
   if (!isNonEmptyString(user?.phoneNumber)) {
     return { ok: false, reason: OPEN_ACCOUNT_BLOCK_REASON.PHONE_NUMBER };
   }
+  const listedBank = getVirtualBankByCode(bank?.bankCode);
+  if (listedBank === null) return { ok: false, reason: OPEN_ACCOUNT_BLOCK_REASON.BANK };
   if (!isNonNegativeSafeInteger(initialBalance) || initialBalance > MAX_DEMO_INITIAL_BALANCE) {
     return { ok: false, reason: OPEN_ACCOUNT_BLOCK_REASON.INITIAL_BALANCE };
   }
@@ -45,7 +50,8 @@ export const buildOpenAccountInput = ({ user, initialBalance } = {}) => {
       ci,
       userName: user.name,
       phoneNumber: user.phoneNumber,
-      bankCode: DEMO_BANK_CODE,
+      bankCode: listedBank.bankCode,
+      bankName: listedBank.bankName,
       productName: DEMO_PRODUCT_NAME,
       initialBalance,
     },
@@ -56,6 +62,7 @@ export const OPEN_ACCOUNT_BLOCK_MESSAGE = Object.freeze({
   [OPEN_ACCOUNT_BLOCK_REASON.USER_ID]: '로그인 정보를 확인할 수 없어 계좌를 만들 수 없어요.',
   [OPEN_ACCOUNT_BLOCK_REASON.USER_NAME]: '저장된 이름 정보가 없어 계좌를 만들 수 없어요.',
   [OPEN_ACCOUNT_BLOCK_REASON.PHONE_NUMBER]: '저장된 전화번호 정보가 없어 계좌를 만들 수 없어요.',
+  [OPEN_ACCOUNT_BLOCK_REASON.BANK]: '은행을 선택해 주세요.',
   [OPEN_ACCOUNT_BLOCK_REASON.INITIAL_BALANCE]: '초기 잔액을 확인해 주세요.',
 });
 

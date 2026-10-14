@@ -6,7 +6,12 @@ import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
 import * as accountApi from './assetAccountApi';
 import * as bankingApi from './bankingApi';
 import * as cashflowApi from './cashflowApi';
-import { ASSET_REQUEST_ERROR, invalidResponse, requestError } from './assetResponse';
+import {
+  ASSET_REQUEST_ERROR,
+  invalidResponse,
+  isAccountNumberUnavailableError,
+  requestError,
+} from './assetResponse';
 import { getLocalDateKey } from './cashflowScreenLogic';
 import {
   loadDailyLimitRecord,
@@ -47,6 +52,10 @@ const resolveRequestAccountId = (state, accountId) => {
   return id;
 };
 
+// 서버가 실제 계좌번호 조회에 실패하면 API-11/14 전체가 502로 실패한다(잔액·거래도 받지 못한 것으로 취급한다).
+const ACCOUNT_NUMBER_UNAVAILABLE_MESSAGE =
+  '계좌번호를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.';
+
 // 계좌 상세 + 최근 거래(API-11). 입력: { accountId? } (생략 시 선택 계좌).
 export const fetchAccountDetail = createAsyncThunk(
   'asset/fetchAccountDetail',
@@ -59,6 +68,9 @@ export const fetchAccountDetail = createAsyncThunk(
     } catch (error) {
       return rejectWithValue({
         ...normalizeApiError(error, '계좌 상세 조회에 실패했습니다.'),
+        ...(isAccountNumberUnavailableError(error)
+          ? { message: ACCOUNT_NUMBER_UNAVAILABLE_MESSAGE }
+          : {}),
         accountId,
       });
     }
@@ -77,6 +89,9 @@ export const refreshAccount = createAsyncThunk(
     } catch (error) {
       return rejectWithValue({
         ...normalizeApiError(error, '계좌 새로고침에 실패했습니다.'),
+        ...(isAccountNumberUnavailableError(error)
+          ? { message: ACCOUNT_NUMBER_UNAVAILABLE_MESSAGE }
+          : {}),
         accountId,
       });
     }

@@ -4,7 +4,7 @@ import { redesign } from '../../theme';
 
 // 홈 계좌 탭. 서버 합계 API가 없으므로 총잔액은 만들지 않는다.
 // state: 'loading' | 'error' | 'empty' | 'list' (resolveHomeAccountsState 결과)
-// accounts: buildHomeAccountItems 결과({ id, label, statusLabel, balanceText })
+// accounts: buildHomeAccountItems 결과({ id, label, maskedAccountNumber, statusLabel, balanceText })
 export default function HomeAccountTab({
   state,
   accounts,
@@ -70,6 +70,9 @@ export default function HomeAccountTab({
             >
               <View style={styles.accountInfo}>
                 <Text style={styles.accountName}>{account.label}</Text>
+                {account.maskedAccountNumber ? (
+                  <Text style={styles.accountStatus}>{account.maskedAccountNumber}</Text>
+                ) : null}
                 {account.statusLabel ? (
                   <Text style={styles.accountStatus}>{account.statusLabel}</Text>
                 ) : null}

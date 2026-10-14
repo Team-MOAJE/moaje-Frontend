@@ -64,17 +64,24 @@ const makeStore = () => configureStore({ reducer: { auth: authReducer, asset: as
 
 // ── 응답 조립 ─────────────────────────────────────────────────
 
-const acctRaw = ({ id = '1', balance = '10000.0000', status = 'ACTIVE' } = {}) =>
-  `{"accountId":"${id}","balance":${balance},"status":"${status}","syncStatus":"SYNCED","lastSyncedAt":null,"createdAt":"2026-10-11T03:00:00"}`;
-const listRaw = (...items) => `{"accounts":[${items.join(',')}]}`;
+// 최신 명세(20261014) API-52: 루트 배열, 항목은 { accountId, bankCode, bankName, balance, status }.
+const acctRaw = ({
+  id = '1',
+  balance = '10000.0000',
+  status = 'ACTIVE',
+  bankCode = 'null',
+  bankName = 'null',
+} = {}) =>
+  `{"accountId":"${id}","bankCode":${bankCode},"bankName":${bankName},"balance":${balance},"status":"${status}"}`;
+const listRaw = (...items) => `[${items.join(',')}]`;
 
 const txRaw = ({ id = '789', type = 'DEPOSIT', status = 'SUCCESS', amount = '1000' } = {}) =>
-  `{"transactionId":${id},"publicTransactionId":"p${id}","type":"${type}","amount":${amount},"status":"${status}","merchantName":null,"categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}`;
+  `{"transactionId":"${id}","publicTransactionId":"p${id}","type":"${type}","amount":${amount},"status":"${status}","merchantName":null,"categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}`;
 const txListRaw = (txs, { nextCursor = 'null', hasNext = false } = {}) =>
   `{"transactions":[${txs.join(',')}],"nextCursor":${nextCursor},"hasNext":${hasNext}}`;
 
 const detailRaw = ({ accountId = '1', balance = '90000', transactions = [] } = {}) =>
-  `{"accountId":${accountId},"bankCode":null,"bankName":null,"displayAccountNumber":"A","maskedAccountNumber":"A","balance":${balance},"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[${transactions.join(',')}],"nextCursor":null,"hasNext":false}`;
+  `{"accountId":"${accountId}","bankCode":null,"bankName":null,"accountNumber":"12345678901234","balance":${balance},"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[${transactions.join(',')}],"nextCursor":null,"hasNext":false}`;
 
 // 계좌 목록을 불러와 선택 계좌까지 준비한다.
 const loadAccounts = async (store, items = [acctRaw()]) => {
@@ -1311,4 +1318,48 @@ test('C-3 거래내역 화면: 재시도 직후 계좌 변경/로그아웃 → �
   await sleep(30);
   assert.equal(gateway.requests.length, before, '로그아웃 후 거래 요청 0');
   assert.equal(asset(store).transactions.length, 0);
+});
+
+// ── 최신 명세(20261014): 계좌별 서버 은행 정보 ───────────────────
+
+test('계좌 목록: 서버 bankCode·bankName이 계좌별 라벨이 되고 여러 은행이 섞이지 않는다', async () => {
+  const store = makeStore();
+  await loadAccounts(store, [
+    acctRaw({ id: '123456789012345679', bankCode: '"001"', bankName: '"카카오뱅크"' }),
+    acctRaw({ id: '123456789012345680', bankCode: '"008"', bankName: '"토스뱅크"' }),
+    acctRaw({ id: '123456789012345681', bankCode: '"008"', bankName: 'null' }), // 코드 매핑
+    acctRaw({ id: '123456789012345682' }), // 은행 정보 없음 → 기존 중립 라벨
+  ]);
+  const { accounts } = asset(store);
+  assert.deepEqual(
+    accounts.map(a => [a.id, a.bankCode, a.bankName, a.label]),
+    [
+      ['123456789012345679', '001', '카카오뱅크', '카카오뱅크'],
+      ['123456789012345680', '008', '토스뱅크', '토스뱅크 1'],
+      ['123456789012345681', '008', '토스뱅크', '토스뱅크 2'],
+      ['123456789012345682', null, null, '내 계좌 4'],
+    ]
+  );
+  // API-52에서 제거된 필드는 만들어 내지 않는다.
+  assert.ok(accounts.every(a => a.syncStatus === null && a.createdAt === null));
+});
+
+test('계좌 목록: 은행 정보가 없는 기존 계좌 1개는 기존처럼 "내 계좌"', async () => {
+  const store = makeStore();
+  await loadAccounts(store, [acctRaw({ id: '1' })]);
+  assert.equal(asset(store).accounts[0].label, '내 계좌');
+  assert.equal(asset(store).accounts[0].bankName, null);
+});
+
+test('사용자 A → 로그아웃 → 사용자 B: A의 은행 정보가 B 상태에 남지 않는다', async () => {
+  const store = makeStore();
+  await loadAccounts(store, [acctRaw({ id: '1', bankCode: '"001"', bankName: '"카카오뱅크"' })]);
+  assert.equal(asset(store).accounts[0].bankName, '카카오뱅크');
+
+  store.dispatch(logoutUser.pending('rid-logout'));
+  assert.deepEqual(asset(store).accounts, []);
+  store.dispatch(loginUser.fulfilled({ user: { userId: '2' } }, 'rid-login', {}));
+  await loadAccounts(store, [acctRaw({ id: '2' })]);
+  assert.equal(asset(store).accounts[0].bankName, null);
+  assert.equal(asset(store).accounts[0].label, '내 계좌');
 });

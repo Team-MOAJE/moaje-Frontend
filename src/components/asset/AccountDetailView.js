@@ -7,8 +7,9 @@ import { redesign } from '../../theme/redesign';
 import TransactionListItem from './TransactionListItem';
 import AccountSelectorBottomSheet from './AccountSelectorBottomSheet';
 
-// 서버에 은행명·실제 계좌번호가 없으므로(API-11의 계좌번호 필드는 ACCOUNT-{id} 고정값) 화면에는 계좌 라벨만 표시한다.
-// titleText/balanceText/statusNotice/sync는 부모(AccountDetailScreen)가 assetScreenLogic으로 만든 표시용 값이다.
+// titleText(계좌 라벨, 서버 은행명 기반)/accountNumberText(API-11 실제 계좌번호의 표시용 포맷)/balanceText/statusNotice/sync는
+// 부모(AccountDetailScreen)가 assetScreenLogic으로 만든 표시용 값이다. 복사할 값은 부모가 결정하며(onCopyAccountNumber),
+// 이 컴포넌트는 표시 문자열을 복사하지 않는다. detailError가 있으면 번호·잔액을 대신 만들지 않고 오류와 재시도만 보여준다.
 const SYNC_TONE_COLOR = {
   error: colors.red,
   progress: redesign.textSecondary,
@@ -20,6 +21,12 @@ export default function AccountDetailView({
   balanceText,
   statusNotice,
   sync,
+  accountNumberText,
+  canCopyAccountNumber,
+  onCopyAccountNumber,
+  copyNotice,
+  detailError,
+  onRetryDetail,
   canTransfer,
   isRecentTransactionsSupported,
   isRecentLoading,
@@ -108,6 +115,52 @@ export default function AccountDetailView({
                 <Feather name="chevron-down" size={20} color={redesign.navInactive} />
               </View>
             </Pressable>
+
+            {detailError ? (
+              <View style={styles.detailErrorBox}>
+                <View style={styles.refreshErrorRowFlat}>
+                  <Feather name="alert-circle" size={13} color={colors.red} />
+                  <Text style={styles.refreshErrorText}>{detailError}</Text>
+                </View>
+                <Pressable
+                  onPress={onRetryDetail}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => pressed && styles.pressedDim}
+                  accessibilityRole="button"
+                  accessibilityLabel="계좌 정보 다시 시도"
+                >
+                  <Text style={styles.detailRetryText}>다시 시도</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.numberRow}>
+                <Text style={styles.numberLabel}>계좌번호</Text>
+                <Text style={styles.numberText} selectable={false}>
+                  {accountNumberText ?? '-'}
+                </Text>
+                <Pressable
+                  onPress={onCopyAccountNumber}
+                  disabled={!canCopyAccountNumber}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => [
+                    styles.copyBtn,
+                    !canCopyAccountNumber && styles.btnDisabled,
+                    pressed && canCopyAccountNumber && styles.btnPressed,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !canCopyAccountNumber }}
+                  accessibilityLabel="계좌번호 복사"
+                >
+                  <Text style={styles.copyBtnText}>복사</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {copyNotice ? (
+              <Text style={[styles.copyNotice, copyNotice.isError && styles.copyNoticeError]}>
+                {copyNotice.message}
+              </Text>
+            ) : null}
 
             {statusNotice ? <Text style={styles.statusNotice}>{statusNotice}</Text> : null}
 
@@ -313,6 +366,57 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 13,
     color: redesign.textSecondary,
+  },
+  numberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 12,
+  },
+  numberLabel: {
+    fontSize: 13,
+    color: redesign.textSecondary,
+  },
+  numberText: {
+    flexShrink: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    color: redesign.textPrimary,
+  },
+  copyBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: redesign.accent,
+  },
+  copyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: redesign.accent,
+  },
+  copyNotice: {
+    marginTop: 8,
+    fontSize: 12,
+    color: redesign.accent,
+  },
+  copyNoticeError: {
+    color: colors.red,
+  },
+  detailErrorBox: {
+    marginTop: 12,
+    gap: 8,
+  },
+  refreshErrorRowFlat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailRetryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: redesign.accent,
   },
   btnDisabled: {
     opacity: 0.4,

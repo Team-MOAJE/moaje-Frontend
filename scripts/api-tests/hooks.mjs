@@ -1,5 +1,6 @@
 // module.register 훅: loader.mjs가 등록한다.
 const STUBS = {
+  'expo-clipboard': new URL('./stubs/expoClipboard.mjs', import.meta.url).href,
   'expo-secure-store': new URL('./stubs/expoSecureStore.mjs', import.meta.url).href,
   'react-native': new URL('./stubs/reactNative.mjs', import.meta.url).href,
   '@react-native-async-storage/async-storage': new URL('./stubs/asyncStorage.mjs', import.meta.url)

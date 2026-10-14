@@ -49,10 +49,14 @@ test('홈: 로딩·오류·빈 상태·목록 4분기와 재시도, 계좌 상�
   assert.match(home, /dispatch\(fetchAccounts\(\)\)/);
 });
 
-test('홈: 은행명·토큰·계좌번호를 임의로 만들지 않는다', () => {
+test('홈: 은행명·토큰·전체 계좌번호를 임의로 만들지 않고, 서버 마스킹 번호(maskedAccountNumber)만 표시한다', () => {
   for (const file of [HOME, HOME_TAB]) {
-    assert.doesNotMatch(code(file), /bankName|tokenId|maskedAccountNumber|accountNumber/);
+    assert.doesNotMatch(
+      code(file),
+      /bankName|tokenId|(?<![A-Za-z])accountNumber|displayAccountNumber/
+    );
   }
+  assert.match(code(HOME_TAB), /account\.maskedAccountNumber/);
 });
 
 test('계좌 상세: API-11/API-14를 쓰고 isPrimary·accounts[0] 선택과 fetchAccounts 새로고침을 쓰지 않는다', () => {
@@ -69,10 +73,15 @@ test('계좌 상세: API-11/API-14를 쓰고 isPrimary·accounts[0] 선택과 fe
 
 test('계좌 상세: 목록에 없는 route accountId로 요청하지 않고, 다른 계좌의 상세는 쓰지 않는다', () => {
   const detail = code(DETAIL);
-  assert.match(detail, /accounts\.some\(account => account\.id === routeAccountId\)/);
+  // route 적용 대기 판단은 순수 함수(문자열 id + 목록 존재)이고, 적용 후 param을 소비한다.
+  assert.match(detail, /hasPendingRouteSeed\(routeAccountId, accounts\)/);
+  assert.match(
+    readSource('src/features/asset/assetScreenLogic.js'),
+    /accounts\.some\(account => account\.id === routeAccountId\)/
+  );
   assert.match(detail, /accountDetailAccountId === selectedAccountId/);
   assert.match(detail, /selectedAccountId == null/);
-  assert.doesNotMatch(detail, /Number\(|parseInt\(|parseFloat\(/);
+  assert.doesNotMatch(detail, /(?<![A-Za-z])Number\(|parseInt\(|parseFloat\(/);
 });
 
 test('계좌 상세: 송금은 ACTIVE 계좌만, 거래내역·거래 상세에는 accountId를 전달한다', () => {
@@ -87,12 +96,20 @@ test('계좌 상세: 송금은 ACTIVE 계좌만, 거래내역·거래 상세에�
   assert.match(view, /조회만 가능한 계좌예요/);
 });
 
-test('계좌 상세/시트/홈: 서버에 없는 은행명·계좌번호·ACCOUNT-{id}를 렌더하지 않는다', () => {
+test('계좌 상세/시트/홈: 은행명을 직접 만들지 않고, 번호는 서버 마스킹 값(목록·시트)과 정규화된 실제 번호(상세)만 쓰며 ACCOUNT-{id}는 렌더하지 않는다', () => {
   for (const file of [HOME, HOME_TAB, DETAIL, VIEW, SHEET]) {
     const source = code(file);
     assert.doesNotMatch(source, /bankName/, file);
-    assert.doesNotMatch(source, /maskedAccountNumber|displayAccountNumber/, file);
+    assert.doesNotMatch(source, /displayAccountNumber/, file);
     assert.doesNotMatch(source, /ACCOUNT-/, file);
+  }
+  // 상세에는 마스킹 번호를 대신 쓰지 않는다(실제 번호가 없으면 '-' 표시와 복사 비활성).
+  for (const file of [DETAIL, VIEW]) {
+    assert.doesNotMatch(code(file), /maskedAccountNumber/, file);
+  }
+  // 목록(홈 탭·선택 시트)에는 전체 번호가 전달되지 않는다.
+  for (const file of [HOME_TAB, SHEET]) {
+    assert.doesNotMatch(code(file), /(?<![A-Za-z])accountNumber/, file);
   }
 });
 
@@ -271,11 +288,12 @@ test('C-3 History: 첫 페이지 요청은 effect 한 곳(요청 키 게이트)�
     'readyAccountId',
     'routeSeedPending',
     'refreshGeneration',
+    'accountDataVersion',
   ]);
   // 키 기록이 dispatch보다 앞서고(동기 차단), ready가 아니면 키·재시도 의도를 폐기한다.
   assert.match(
     effect.body,
-    /const requestKey = `\$\{sessionGeneration\}#\$\{readyAccountId\}#\$\{refreshGeneration\}`/
+    /const requestKey = `\$\{sessionGeneration\}#\$\{readyAccountId\}#\$\{refreshGeneration\}#\$\{accountDataVersion\}`/
   );
   assert.match(effect.body, /if \(lastRequestKeyRef\.current === requestKey\) return;/);
   assert.ok(
@@ -345,7 +363,7 @@ test('C-3 History: route accountId는 목록 존재를 검증하고, 없으면 �
     source,
     /navigate\(ROUTES\.TRANSACTION_DETAIL,\s*\{\s*accountId: readyAccountId,\s*transactionId: tx\.id,?\s*\}\)/
   );
-  assert.doesNotMatch(source, /Number\(|parseInt\(|parseFloat\(/);
+  assert.doesNotMatch(source, /(?<![A-Za-z])Number\(|parseInt\(|parseFloat\(/);
   // 모든 상태의 거래 행을 누를 수 있다(pending/checking 탭 차단 없음).
   assert.doesNotMatch(source, /=== 'checking'|=== 'pending'/);
   assert.match(source, /onPress=\{\(\) => handleTxPress\(t\)\}/);
@@ -366,7 +384,7 @@ test('C-3 History: 서버 데이터를 useState/모듈 전역에 복사하지 �
 test('C-3 Detail: 필수 params 둘 다 문자열일 때만 요청하고 Number 변환·선택 계좌 대체가 없다', () => {
   const source = code(TX_DETAIL);
   assert.match(source, /isNonEmptyString\(accountId\) && isNonEmptyString\(transactionId\)/);
-  assert.doesNotMatch(source, /Number\(|parseInt\(|parseFloat\(/);
+  assert.doesNotMatch(source, /(?<![A-Za-z])Number\(|parseInt\(|parseFloat\(/);
   assert.doesNotMatch(source, /selectedAccountId/);
   assert.match(source, /fetchTransactionDetail\(\{ accountId, transactionId \}\)/);
 });
@@ -535,9 +553,14 @@ test('C-3 범위: History/Detail은 C-3 화면 간 이동 계약만 따르고 �
 // ── C-4: TransferScreen (출금 계좌 고정·차단, 잔액 정밀도, 송금 계약 보존) ─────────────────
 const TRANSFER = 'src/screens/asset/TransferScreen.js';
 
-test('C-4 Transfer: 구형 표시(bankName·0원 대체·계좌번호·tokenId)와 숫자 변환이 없다', () => {
+test('C-4 Transfer: 구형 표시(계좌 은행명 추측·0원 대체·계좌번호·tokenId)와 숫자 변환이 없다', () => {
   const source = code(TRANSFER);
-  assert.doesNotMatch(source, /bankName|tokenId|maskedAccountNumber|displayAccountNumber|ACCOUNT-/);
+  assert.doesNotMatch(source, /tokenId|maskedAccountNumber|displayAccountNumber|ACCOUNT-/);
+  // 은행명은 서버 계좌 정보(라벨)나 가상 은행 목록 조회로만 얻고, 계좌 ID 등으로 추측하지 않는다.
+  assert.doesNotMatch(source, /bankName\s*:|selectedAccount\.bankName|account\.bankName/);
+  for (const match of source.matchAll(/.*bankName.*/g)) {
+    assert.match(match[0], /getVirtualBankByCode\(|shownBankName|bankLabel/, match[0]);
+  }
   assert.doesNotMatch(source, /balance\s*\?\?\s*0|\?\?\s*0\)/);
   assert.doesNotMatch(source, /Number\(\s*(selectedAccount|fromParam|requested|pinned)/);
   assert.doesNotMatch(source, /parseInt\(\s*(selectedAccount|fromParam|requested|pinned)/);
@@ -552,7 +575,12 @@ test('C-4 Transfer: 구형 표시(bankName·0원 대체·계좌번호·tokenId)�
 test('C-4 Transfer: 출금 계좌 판별은 파라미터 존재와 형식을 분리하고 다른 계좌로 대체하지 않는다', () => {
   const source = code(TRANSFER);
   assert.match(source, /Object\.prototype\.hasOwnProperty\.call\(routeParams, 'fromAccountId'\)/);
-  assert.match(source, /typeof fromParam === 'string' && fromParam\.trim\(\)\.length > 0/);
+  // 형식 검증은 순수 함수 resolveTransferFromId에 있다(파라미터 존재와 형식을 분리).
+  assert.match(source, /resolveTransferFromId\(\{/);
+  assert.match(
+    readSource('src/features/asset/assetScreenLogic.js'),
+    /typeof fromParam === 'string' && fromParam\.trim\(\)\.length > 0/
+  );
   assert.match(source, /canTransferFrom\(requestedAccount\) \? requestedAccount : null/);
   // 파라미터가 있는 경우에는 선택값(pinned)·기본 계좌 폴백을 쓰지 않는다.
   assert.match(source, /if \(hasFromParam\) return;/);
@@ -597,7 +625,7 @@ test('C-4 Transfer: API-10 송금 계약과 멱등성 키 흐름(입력 변경 �
   for (const handler of [
     'handleAmountChange',
     'handleQuickAmount',
-    'handleDepositBankChange',
+    'handleDepositBankSelect',
     'handleDepositAccountChange',
   ]) {
     assert.match(
@@ -611,7 +639,7 @@ test('C-4 Transfer: API-10 송금 계약과 멱등성 키 흐름(입력 변경 �
     'handleAmountChange',
     'handleQuickAmount',
     'handleMaxAmount',
-    'handleDepositBankChange',
+    'handleDepositBankSelect',
     'handleDepositAccountChange',
   ]) {
     assert.match(

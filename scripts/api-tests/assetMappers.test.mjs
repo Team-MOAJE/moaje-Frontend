@@ -46,6 +46,7 @@ const txModel = (overrides = {}) => ({
 // ── 계좌 매퍼 ────────────────────────────────────────────────
 
 test('normalizeAccount: 서버에 없는 은행명·토큰·주 계좌를 만들지 않고, 정확하지 않은 잔액은 null', () => {
+  // 은행 정보가 없으면 계좌 ID 등으로 추측하지 않고 null이다.
   assert.deepEqual(normalizeAccount(accountModel()), {
     id: '1',
     balance: 10000,
@@ -54,7 +55,10 @@ test('normalizeAccount: 서버에 없는 은행명·토큰·주 계좌를 만들
     syncStatus: 'SYNCED',
     lastSyncedAt: null,
     createdAt: '2026-10-11T03:00:00',
+    bankCode: null,
     bankName: null,
+    bankInfoConflict: false,
+    maskedAccountNumber: null,
     tokenId: null,
     isPrimary: false,
     isActive: true,
@@ -138,8 +142,7 @@ test('normalizeAccountDetail: 서버 값을 그대로 전달하고 거래는 nor
     accountId: '1',
     bankCode: null,
     bankName: null,
-    displayAccountNumber: 'ACCOUNT-1',
-    maskedAccountNumber: 'ACCOUNT-1',
+    accountNumber: '12345678901234',
     balance: null,
     balanceExact: false,
     syncStatus: 'RECONCILING',

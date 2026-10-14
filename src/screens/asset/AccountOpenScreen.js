@@ -16,8 +16,8 @@ import { useSelector, useDispatch, useStore } from 'react-redux';
 import { redesign } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import { fetchAccounts, openAccount } from '../../features/asset/assetApi';
+import BankSelectModal from '../../components/asset/BankSelectModal';
 import {
-  DEMO_BANK_CODE,
   DEMO_PRODUCT_NAME,
   OPEN_ACCOUNT_BLOCK_MESSAGE,
   OPEN_ACCOUNT_BLOCK_REASON,
@@ -26,6 +26,7 @@ import {
 } from '../../features/asset/accountOpenInput';
 
 const QUICK_AMOUNTS = [100000, 500000, 1000000];
+const BANK_PLACEHOLDER = '은행을 선택해 주세요';
 
 const PLACEHOLDER_COLOR = '#C4C4BF';
 
@@ -38,13 +39,18 @@ export default function AccountOpenScreen({ navigation }) {
   const openAccountLoading = useSelector(state => state.asset.openAccountLoading);
 
   const [initialBalance, setInitialBalance] = useState(0);
+  // 사용자가 고른 가상 은행({ bankCode, bankName }). 미선택이면 null이며 개설이 차단된다. 저장하지 않는다.
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [bankModalVisible, setBankModalVisible] = useState(false);
   const submittingRef = useRef(false);
 
-  const built = buildOpenAccountInput({ user, initialBalance });
+  const built = buildOpenAccountInput({ user, initialBalance, bank: selectedBank });
   const blockReason = built.ok ? null : built.reason;
-  // 이름·전화번호·로그인 정보 부족은 입력으로 해결할 수 없으므로 항상 안내한다(잔액 입력 오류와 구분).
+  // 이름·전화번호·로그인 정보 부족은 입력으로 해결할 수 없으므로 항상 안내한다(은행·잔액 입력 오류와 구분).
   const profileNotice =
-    blockReason !== null && blockReason !== OPEN_ACCOUNT_BLOCK_REASON.INITIAL_BALANCE
+    blockReason !== null &&
+    blockReason !== OPEN_ACCOUNT_BLOCK_REASON.INITIAL_BALANCE &&
+    blockReason !== OPEN_ACCOUNT_BLOCK_REASON.BANK
       ? OPEN_ACCOUNT_BLOCK_MESSAGE[blockReason]
       : null;
   const isActive = built.ok && !openAccountLoading;
@@ -52,6 +58,18 @@ export default function AccountOpenScreen({ navigation }) {
   const handleBack = () => {
     if (navigation.canGoBack()) navigation.goBack();
     else navigation.navigate(ROUTES.HOME);
+  };
+
+  // 요청 중에는 은행을 바꿀 수 없다(요청 본문과 화면 표시가 어긋나지 않게).
+  const handleBankPress = () => {
+    if (openAccountLoading || submittingRef.current) return;
+    setBankModalVisible(true);
+  };
+
+  const handleBankSelect = bank => {
+    setBankModalVisible(false);
+    if (openAccountLoading || submittingRef.current) return;
+    setSelectedBank(bank);
   };
 
   const handleBalanceChange = text => {
@@ -114,8 +132,25 @@ export default function AccountOpenScreen({ navigation }) {
             {profileNotice ? <Text style={styles.warning}>{profileNotice}</Text> : null}
 
             <View style={styles.section}>
-              <Text style={styles.label}>은행 코드</Text>
-              <Text style={styles.fixedValue}>{DEMO_BANK_CODE}</Text>
+              <Text style={styles.label}>은행 선택</Text>
+              <Pressable
+                onPress={handleBankPress}
+                disabled={openAccountLoading}
+                accessibilityRole="button"
+                accessibilityLabel="은행 선택"
+                accessibilityState={{ disabled: openAccountLoading }}
+                style={({ pressed }) => [styles.bankSelect, pressed && styles.pressed]}
+              >
+                <Text
+                  style={[
+                    styles.bankSelectText,
+                    selectedBank === null && styles.bankSelectPlaceholder,
+                  ]}
+                >
+                  {selectedBank?.bankName ?? BANK_PLACEHOLDER}
+                </Text>
+                <Feather name="chevron-down" size={20} color={redesign.textSecondary} />
+              </Pressable>
             </View>
 
             <View style={styles.section}>
@@ -174,6 +209,13 @@ export default function AccountOpenScreen({ navigation }) {
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
+
+      <BankSelectModal
+        visible={bankModalVisible}
+        selectedBankCode={selectedBank?.bankCode ?? null}
+        onSelect={handleBankSelect}
+        onClose={() => setBankModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -234,6 +276,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: redesign.textPrimary,
     marginTop: 4,
+  },
+  bankSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: redesign.divider,
+  },
+  bankSelectText: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: redesign.textPrimary,
+  },
+  bankSelectPlaceholder: {
+    color: PLACEHOLDER_COLOR,
   },
   question: {
     fontSize: 18,

@@ -15,8 +15,12 @@ import {
 } from './assetTestEnv.mjs';
 
 const { API_ENDPOINTS } = await import('../../src/constants/apiEndpoints.js');
-const { ASSET_ERROR_TYPE, ASSET_REQUEST_ERROR, getAssetErrorType } =
-  await import('../../src/features/asset/assetResponse.js');
+const {
+  ASSET_ERROR_TYPE,
+  ASSET_REQUEST_ERROR,
+  getAssetErrorType,
+  isAccountNumberUnavailableError,
+} = await import('../../src/features/asset/assetResponse.js');
 const { OnboardingRequestError } = await import('../../src/features/onboarding/onboardingApi.js');
 const {
   buildTransactionsQuery,
@@ -49,8 +53,7 @@ const detailFixture = (overrides = {}) => ({
   accountId: 123,
   bankCode: null,
   bankName: null,
-  displayAccountNumber: 'ACCOUNT-123',
-  maskedAccountNumber: 'ACCOUNT-123',
+  accountNumber: '12345678901234',
   balance: 90000,
   syncStatus: 'SYNCED',
   refreshing: false,
@@ -93,8 +96,7 @@ test('API-11: GET, Bearer, 본문·쿼리 없음, 응답을 camelCase 모델로 
     accountId: '123',
     bankCode: null,
     bankName: null,
-    displayAccountNumber: 'ACCOUNT-123',
-    maskedAccountNumber: 'ACCOUNT-123',
+    accountNumber: '12345678901234',
     balance: 90000,
     balanceExact: true,
     syncStatus: 'SYNCED',
@@ -126,7 +128,7 @@ test('API-11: 19자리 accountId·transactionId·nextCursor를 문자열로 보�
     'GET',
     detailPath(BIG_ACCOUNT_ID),
     rawJsonRoute(
-      `{"accountId":${BIG_ACCOUNT_ID},"displayAccountNumber":"ACCOUNT-${BIG_ACCOUNT_ID}","maskedAccountNumber":"ACCOUNT-${BIG_ACCOUNT_ID}","balance":1,"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"lastSyncedAt":null,"transactionHistory":[{"transactionId":${BIG_TX_ID},"publicTransactionId":"p","type":"DEPOSIT","amount":1,"status":"SUCCESS","categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}],"nextCursor":${BIG_CURSOR},"hasNext":true}`
+      `{"accountId":${BIG_ACCOUNT_ID},"accountNumber":"12345678901234","balance":1,"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"lastSyncedAt":null,"transactionHistory":[{"transactionId":${BIG_TX_ID},"publicTransactionId":"p","type":"DEPOSIT","amount":1,"status":"SUCCESS","categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}],"nextCursor":${BIG_CURSOR},"hasNext":true}`
     )
   );
 
@@ -371,17 +373,17 @@ test('오류 분류: 응답 지연 → TIMEOUT, 연결 끊김 → NETWORK, 토�
 
 const LIST_PATH = '/api/v1/assets/accounts';
 
+// 최신 명세(20261014): 루트 배열, 항목 { accountId(문자열), bankCode, bankName, balance, status }.
 const listItemRaw = ({
   accountId = '"1"',
   balance = '10000.0000',
   status = 'ACTIVE',
-  syncStatus = 'SYNCED',
-  lastSyncedAt = 'null',
-  createdAt = '"2026-10-11T03:00:00"',
+  bankCode = 'null',
+  bankName = 'null',
 } = {}) =>
-  `{"accountId":${accountId},"balance":${balance},"status":"${status}","syncStatus":"${syncStatus}","lastSyncedAt":${lastSyncedAt},"createdAt":${createdAt}}`;
+  `{"accountId":${accountId},"bankCode":${bankCode},"bankName":${bankName},"balance":${balance},"status":"${status}"}`;
 
-const listRaw = (...items) => `{"accounts":[${items.join(',')}]}`;
+const listRaw = (...items) => `[${items.join(',')}]`;
 
 const balancesOf = async rawBalances => {
   gateway.route(
@@ -393,8 +395,12 @@ const balancesOf = async rawBalances => {
   return accounts.map(({ balance, balanceExact }) => ({ balance, balanceExact }));
 };
 
-test('API-52: GET, Bearer, 본문·쿼리 없음, 모델은 6개 필드뿐(은행·계좌번호 필드 없음)', async () => {
-  gateway.route('GET', LIST_PATH, rawJsonRoute(listRaw(listItemRaw())));
+test('API-52: GET, Bearer, 본문·쿼리 없음, 모델은 은행 정보를 포함한 5개 필드(+정확 여부)뿐', async () => {
+  gateway.route(
+    'GET',
+    LIST_PATH,
+    rawJsonRoute(listRaw(listItemRaw({ bankCode: '"001"', bankName: '"카카오뱅크"' })))
+  );
 
   const result = await fetchAccountList();
 
@@ -407,21 +413,51 @@ test('API-52: GET, Bearer, 본문·쿼리 없음, 모델은 6개 필드뿐(은�
     accounts: [
       {
         accountId: '1',
+        bankCode: '001',
+        bankName: '카카오뱅크',
+        maskedAccountNumber: null,
         balance: 10000,
         balanceExact: true,
         status: 'ACTIVE',
-        syncStatus: 'SYNCED',
-        lastSyncedAt: null,
-        createdAt: '2026-10-11T03:00:00',
       },
     ],
   });
-  for (const key of ['bankName', 'bankCode', 'displayAccountNumber', 'maskedAccountNumber']) {
+  // 최신 명세에서 제거된 필드를 만들어 내지 않는다.
+  for (const key of [
+    'syncStatus',
+    'lastSyncedAt',
+    'createdAt',
+    'displayAccountNumber',
+    'accountNumber',
+  ]) {
     assert.equal(key in result.accounts[0], false);
   }
 });
 
-test('API-52: 빈 accounts는 정상, 여러 계좌는 서버 순서와 상태를 그대로 유지', async () => {
+test('API-52: bankCode·bankName이 null이거나 키가 없어도 정상(null)이며 코드의 앞자리 0을 보존', async () => {
+  gateway.route(
+    'GET',
+    LIST_PATH,
+    rawJsonRoute(
+      listRaw(
+        listItemRaw(),
+        listItemRaw({ bankCode: '"008"' }),
+        '{"accountId":"3","balance":1,"status":"ACTIVE"}'
+      )
+    )
+  );
+  const { accounts } = await fetchAccountList();
+  assert.deepEqual(
+    accounts.map(a => [a.accountId, a.bankCode, a.bankName]),
+    [
+      ['1', null, null],
+      ['1', '008', null],
+      ['3', null, null],
+    ]
+  );
+});
+
+test('API-52: 빈 배열은 정상, 여러 계좌는 서버 순서와 상태를 그대로 유지', async () => {
   gateway.route('GET', LIST_PATH, rawJsonRoute(listRaw()));
   assert.deepEqual(await fetchAccountList(), { accounts: [] });
 
@@ -431,23 +467,18 @@ test('API-52: 빈 accounts는 정상, 여러 계좌는 서버 순서와 상태�
     rawJsonRoute(
       listRaw(
         listItemRaw({ accountId: '"3"', status: 'CLOSED' }),
-        listItemRaw({ accountId: '"1"', status: 'ACTIVE', syncStatus: 'STALE' }),
-        listItemRaw({
-          accountId: '"2"',
-          status: 'SUSPENDED',
-          syncStatus: 'RECONCILING',
-          lastSyncedAt: '"2026-10-11T04:00:00"',
-        })
+        listItemRaw({ accountId: '"1"', status: 'ACTIVE' }),
+        listItemRaw({ accountId: '"2"', status: 'SUSPENDED' })
       )
     )
   );
   const { accounts } = await fetchAccountList();
   assert.deepEqual(
-    accounts.map(a => [a.accountId, a.status, a.syncStatus, a.lastSyncedAt]),
+    accounts.map(a => [a.accountId, a.status]),
     [
-      ['3', 'CLOSED', 'SYNCED', null],
-      ['1', 'ACTIVE', 'STALE', null],
-      ['2', 'SUSPENDED', 'RECONCILING', '2026-10-11T04:00:00'],
+      ['3', 'CLOSED'],
+      ['1', 'ACTIVE'],
+      ['2', 'SUSPENDED'],
     ]
   );
 });
@@ -471,6 +502,24 @@ test('API-52: 9223372036854775807 accountId는 JSON 문자열·JSON 숫자 어�
     ['9223372036854775807', '9223372036854775806']
   );
   assert.ok(accounts.every(a => typeof a.accountId === 'string'));
+});
+
+test('API-52: 19자리 문자열 accountId 두 개가 서로 구별되어 보존된다(Number 반올림 없음)', async () => {
+  gateway.route(
+    'GET',
+    LIST_PATH,
+    rawJsonRoute(
+      listRaw(
+        listItemRaw({ accountId: '"123456789012345679"' }),
+        listItemRaw({ accountId: '"123456789012345678"' })
+      )
+    )
+  );
+  const { accounts } = await fetchAccountList();
+  assert.deepEqual(
+    accounts.map(a => a.accountId),
+    ['123456789012345679', '123456789012345678']
+  );
 });
 
 test('API-52: balance 원문 판정 — 정수·소수부 0은 정확, 소수부/범위 초과/지수는 추측 없이 null', async () => {
@@ -519,19 +568,20 @@ test('API-52: 파싱 후 정수로 보이는 소수(1.00000000000000001)도 원�
 
 test('API-52: 응답 형식 위반 → invalidResponse (값 보정·항목 제외 없음)', async () => {
   const bad = [
-    '[]',
     '{}',
+    '{"accounts":[]}', // 구 소스의 객체형은 최신 계약이 아니다
     '{"accounts":null}',
-    '{"accounts":[null]}',
+    'null',
+    '[null]',
     listRaw(listItemRaw({ status: 'DELETED' })),
-    listRaw(listItemRaw({ syncStatus: 'UNKNOWN' })),
     listRaw(listItemRaw({ accountId: '"abc"' })),
     listRaw(listItemRaw({ accountId: '0' })),
     listRaw(listItemRaw({ balance: '"100"' })),
     listRaw(listItemRaw({ balance: 'null' })),
-    listRaw(listItemRaw({ lastSyncedAt: '123' })),
-    '{"accounts":[{"accountId":"1","balance":1,"status":"ACTIVE","syncStatus":"SYNCED","lastSyncedAt":null}]}',
-    '{"accounts":[{"accountId":"1","status":"ACTIVE","syncStatus":"SYNCED","lastSyncedAt":null,"createdAt":"2026-10-11T03:00:00"}]}',
+    listRaw(listItemRaw({ bankCode: '1' })),
+    listRaw(listItemRaw({ bankName: '123' })),
+    '[{"accountId":"1","status":"ACTIVE"}]',
+    '[{"balance":1,"status":"ACTIVE"}]',
     'not json',
   ];
   for (const raw of bad) {
@@ -541,16 +591,7 @@ test('API-52: 응답 형식 위반 → invalidResponse (값 보정·항목 제�
   }
 });
 
-test('API-52: lastSyncedAt 키 누락은 null, 오류 분류(401·타임아웃·네트워크)와 재시도 없음', async () => {
-  gateway.route(
-    'GET',
-    LIST_PATH,
-    rawJsonRoute(
-      '{"accounts":[{"accountId":"1","balance":1,"status":"ACTIVE","syncStatus":"SYNCED","createdAt":"2026-10-11T03:00:00"}]}'
-    )
-  );
-  assert.equal((await fetchAccountList()).accounts[0].lastSyncedAt, null);
-
+test('API-52: 오류 분류(401·타임아웃·네트워크)와 재시도 없음', async () => {
   gateway.route('GET', LIST_PATH, jsonRoute({}, { delay: 600 }));
   assert.equal(getAssetErrorType(await rejectionOf(fetchAccountList())), ASSET_ERROR_TYPE.TIMEOUT);
 
@@ -581,7 +622,7 @@ test('API-52: lastSyncedAt 키 누락은 null, 오류 분류(401·타임아웃·
 // ── API-11~14 금액(balance·amount) 원문 보존 ─────────────────
 
 const detailRaw = ({ balance = '90000', transactions = [], extra = '' } = {}) =>
-  `{"accountId":123,"bankCode":null,"bankName":null,"displayAccountNumber":"ACCOUNT-123","maskedAccountNumber":"ACCOUNT-123","balance":${balance},"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[${transactions.join(',')}],"nextCursor":null,"hasNext":false${extra}}`;
+  `{"accountId":123,"bankCode":null,"bankName":null,"accountNumber":"12345678901234","balance":${balance},"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[${transactions.join(',')}],"nextCursor":null,"hasNext":false${extra}}`;
 
 const txRaw = ({ amount = '1000', id = '789' } = {}) =>
   `{"transactionId":${id},"publicTransactionId":"p","type":"DEPOSIT","amount":${amount},"status":"SUCCESS","categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}`;
@@ -684,7 +725,7 @@ test('API-11~13: 큰 id와 금액 토큰이 한 응답에 공존해도 둘 다 �
     'GET',
     detailPath(BIG_ACCOUNT_ID),
     rawJsonRoute(
-      `{"accountId":${BIG_ACCOUNT_ID},"bankCode":null,"bankName":"amount\\":1.5","displayAccountNumber":"A","maskedAccountNumber":"A","balance":12345.6789,"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[{"transactionId":${BIG_TX_ID},"publicTransactionId":"p","type":"WITHDRAW","amount":7000.0000,"merchantName":"balance\\":2.5","status":"SUCCESS","categoryCode":"CAFE","createdAt":"2026-10-11T03:00:00"}],"nextCursor":${BIG_CURSOR},"hasNext":true}`
+      `{"accountId":${BIG_ACCOUNT_ID},"bankCode":null,"bankName":"amount\\":1.5","accountNumber":"12345678901234","balance":12345.6789,"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[{"transactionId":${BIG_TX_ID},"publicTransactionId":"p","type":"WITHDRAW","amount":7000.0000,"merchantName":"balance\\":2.5","status":"SUCCESS","categoryCode":"CAFE","createdAt":"2026-10-11T03:00:00"}],"nextCursor":${BIG_CURSOR},"hasNext":true}`
     )
   );
 
@@ -705,4 +746,183 @@ test('API-11~13: 큰 id와 금액 토큰이 한 응답에 공존해도 둘 다 �
 test('실제 서버 미호출: 모든 요청 목적지는 모의 Gateway(127.0.0.1)뿐', () => {
   assert.ok(everRequested.length > 0);
   assert.ok(everRequested.every(entry => entry.host === '127.0.0.1'));
+});
+
+// ── 최신 명세(20261014): 문자열 ID + 은행 정보 ──────────────────
+
+const stringIdDetailRaw = ({ bankCode = '"001"', bankName = '"카카오뱅크"' } = {}) =>
+  `{"accountId":"${BIG_ACCOUNT_ID}","bankCode":${bankCode},"bankName":${bankName},"accountNumber":"12345678901234","balance":500000,"syncStatus":"SYNCED","refreshing":false,"refreshFailed":false,"message":null,"lastSyncedAt":null,"transactionHistory":[{"transactionId":"${BIG_TX_ID}","publicTransactionId":"p","type":"DEPOSIT","amount":1,"status":"SUCCESS","categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}],"nextCursor":"${BIG_CURSOR}","hasNext":true}`;
+
+test('API-11: 문자열 accountId·transactionId·nextCursor(19자리)와 bankCode·bankName을 그대로 받는다', async () => {
+  gateway.route('GET', detailPath(BIG_ACCOUNT_ID), rawJsonRoute(stringIdDetailRaw()));
+
+  const detail = await fetchAccountDetail(BIG_ACCOUNT_ID);
+
+  assert.equal(detail.accountId, BIG_ACCOUNT_ID);
+  assert.equal(detail.transactionHistory[0].transactionId, BIG_TX_ID);
+  assert.equal(detail.nextCursor, BIG_CURSOR);
+  assert.equal(detail.bankCode, '001');
+  assert.equal(detail.bankName, '카카오뱅크');
+  assert.equal(typeof detail.bankCode, 'string');
+});
+
+test('API-11: bankCode·bankName이 null이어도 정상이고, 문자열이 아니면 형식 오류', async () => {
+  gateway.route(
+    'GET',
+    detailPath(BIG_ACCOUNT_ID),
+    rawJsonRoute(stringIdDetailRaw({ bankCode: 'null', bankName: 'null' }))
+  );
+  const detail = await fetchAccountDetail(BIG_ACCOUNT_ID);
+  assert.equal(detail.bankCode, null);
+  assert.equal(detail.bankName, null);
+
+  gateway.route(
+    'GET',
+    detailPath(BIG_ACCOUNT_ID),
+    rawJsonRoute(stringIdDetailRaw({ bankCode: '1' }))
+  );
+  assert.equal((await rejectionOf(fetchAccountDetail(BIG_ACCOUNT_ID))).invalidResponse, true);
+});
+
+test('API-14: 새로고침 응답도 문자열 ID와 bankCode·bankName을 API-11과 같은 모델로 받는다', async () => {
+  gateway.route(
+    'POST',
+    refreshPath(BIG_ACCOUNT_ID),
+    rawJsonRoute(stringIdDetailRaw({ bankCode: '"008"', bankName: '"토스뱅크"' }))
+  );
+
+  const detail = await refreshAccount(BIG_ACCOUNT_ID);
+
+  const [request] = gateway.requestsTo(refreshPath(BIG_ACCOUNT_ID));
+  assert.equal(request.method, 'POST');
+  assert.equal(request.body, undefined, '본문 없는 POST');
+  assert.equal(detail.accountId, BIG_ACCOUNT_ID);
+  assert.equal(detail.bankCode, '008');
+  assert.equal(detail.bankName, '토스뱅크');
+  assert.equal(detail.nextCursor, BIG_CURSOR);
+});
+
+test('API-13: 문자열 nextCursor를 lastTransactionId 그대로 다음 요청에 보낸다(Number 변환 없음)', async () => {
+  gateway.route(
+    'GET',
+    txListPath(BIG_ACCOUNT_ID),
+    rawJsonRoute(
+      `{"transactions":[{"transactionId":"${BIG_TX_ID}","publicTransactionId":"p","type":"DEPOSIT","amount":1,"status":"SUCCESS","categoryCode":"INCOME","createdAt":"2026-10-11T03:00:00"}],"nextCursor":"${BIG_CURSOR}","hasNext":true}`
+    )
+  );
+
+  const page = await fetchAccountTransactions(BIG_ACCOUNT_ID);
+  assert.equal(page.nextCursor, BIG_CURSOR);
+  assert.equal(page.transactions[0].transactionId, BIG_TX_ID);
+
+  await fetchAccountTransactions(BIG_ACCOUNT_ID, { lastTransactionId: page.nextCursor });
+  const [, second] = gateway.requestsTo(txListPath(BIG_ACCOUNT_ID));
+  assert.equal(second.query, `lastTransactionId=${BIG_CURSOR}`);
+});
+
+// ── 계좌번호(최신 서버 20261014): API-52 maskedAccountNumber, API-11/14 accountNumber, 502 ACCOUNT_NUMBER_UNAVAILABLE ──
+
+test('API-52: 서버가 준 maskedAccountNumber를 그대로 전달하고(마스킹을 만들지 않음) 없으면 null', async () => {
+  gateway.route(
+    'GET',
+    LIST_PATH,
+    rawJsonRoute(
+      listRaw(
+        listItemRaw({ accountId: '"1"' }).replace(
+          '"status"',
+          '"maskedAccountNumber":"**********1234","status"'
+        ),
+        listItemRaw({ accountId: '"2"' })
+      )
+    )
+  );
+  const { accounts } = await fetchAccountList();
+  assert.equal(accounts[0].maskedAccountNumber, '**********1234');
+  assert.equal(accounts[1].maskedAccountNumber, null);
+  // 목록에는 전체 계좌번호 필드가 없다.
+  assert.equal('accountNumber' in accounts[0], false);
+});
+
+test('API-11: accountNumber는 14자리 숫자 문자열 원문(앞자리 0 보존)이고, null/키 없음은 null, 형식이 다르면 응답 오류', async () => {
+  gateway.route(
+    'GET',
+    detailPath('123'),
+    jsonRoute(detailFixture({ accountNumber: '00123456789012' }))
+  );
+  assert.equal((await fetchAccountDetail('123')).accountNumber, '00123456789012');
+
+  const noKey = detailFixture();
+  delete noKey.accountNumber;
+  gateway.route('GET', detailPath('123'), jsonRoute(noKey));
+  assert.equal((await fetchAccountDetail('123')).accountNumber, null);
+
+  gateway.route('GET', detailPath('123'), jsonRoute(detailFixture({ accountNumber: null })));
+  assert.equal((await fetchAccountDetail('123')).accountNumber, null);
+
+  for (const bad of [
+    12345678901234,
+    '1234',
+    '1234-5678-901234',
+    '*******8901234',
+    'ACCOUNT-123',
+    '123456789012345',
+  ]) {
+    gateway.route('GET', detailPath('123'), jsonRoute(detailFixture({ accountNumber: bad })));
+    const error = await rejectionOf(fetchAccountDetail('123'));
+    assert.equal(error.invalidResponse, true, String(bad));
+    assert.equal(error.invalidField, 'accountDetail.accountNumber');
+  }
+});
+
+test('API-11/14: 구버전 displayAccountNumber·maskedAccountNumber 없이도 정상이며 모델에 만들어지지 않는다', async () => {
+  gateway.route('GET', detailPath('123'), jsonRoute(detailFixture()));
+  const detail = await fetchAccountDetail('123');
+  assert.equal('displayAccountNumber' in detail, false);
+  assert.equal('maskedAccountNumber' in detail, false);
+
+  gateway.route(
+    'POST',
+    `${detailPath('123').replace('/detail', '/refresh')}`,
+    jsonRoute(detailFixture())
+  );
+  const refreshed = await refreshAccount('123');
+  assert.equal(refreshed.accountNumber, '12345678901234');
+});
+
+test('API-11/14: 502 ProblemDetail(title=ACCOUNT_NUMBER_UNAVAILABLE)는 상세 전체 실패로 분류되고 code가 보존된다', async () => {
+  const problem = {
+    type: 'about:blank',
+    title: 'ACCOUNT_NUMBER_UNAVAILABLE',
+    status: 502,
+    detail: '계좌번호를 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+  };
+  gateway.route('GET', detailPath('123'), jsonRoute(problem, { status: 502 }));
+  const detailError = await rejectionOf(fetchAccountDetail('123'));
+  assert.equal(detailError.status, 502);
+  assert.equal(detailError.code, 'ACCOUNT_NUMBER_UNAVAILABLE');
+  assert.equal(isAccountNumberUnavailableError(detailError), true);
+
+  gateway.route(
+    'POST',
+    detailPath('123').replace('/detail', '/refresh'),
+    jsonRoute(problem, { status: 502 })
+  );
+  const refreshError = await rejectionOf(refreshAccount('123'));
+  assert.equal(isAccountNumberUnavailableError(refreshError), true);
+
+  // 일반 502(제목이 코드 형태가 아님)·다른 상태 코드는 이 오류로 분류하지 않는다.
+  gateway.route(
+    'GET',
+    detailPath('123'),
+    jsonRoute({ title: 'Bad Gateway', status: 502 }, { status: 502 })
+  );
+  const generic = await rejectionOf(fetchAccountDetail('123'));
+  assert.equal(generic.code, null);
+  assert.equal(isAccountNumberUnavailableError(generic), false);
+
+  gateway.route('GET', detailPath('123'), jsonRoute(problem, { status: 500 }));
+  assert.equal(
+    isAccountNumberUnavailableError(await rejectionOf(fetchAccountDetail('123'))),
+    false
+  );
 });

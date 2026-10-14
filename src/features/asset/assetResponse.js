@@ -35,6 +35,11 @@ export const ASSET_REQUEST_ERROR = Object.freeze({
 
 // 서비스 공통 오류 분류(네트워크·타임아웃·401·403·404·4xx·5xx·invalidResponse)를 그대로 쓴다.
 // 409(IDEMPOTENCY_KEY_CONFLICT 등)는 CLIENT_ERROR로 분류되며 세부 구분은 error.code(Banking 본문 code)를 본다.
+// 계좌 상세(API-11/14)에서 실제 계좌번호 조회에 실패하면 서버가 상세 전체를 502로 내린다(ProblemDetail title).
+export const ACCOUNT_NUMBER_UNAVAILABLE_CODE = 'ACCOUNT_NUMBER_UNAVAILABLE';
+export const isAccountNumberUnavailableError = error =>
+  error?.status === 502 && error?.code === ACCOUNT_NUMBER_UNAVAILABLE_CODE;
+
 export const ASSET_ERROR_TYPE = ONBOARDING_ERROR_TYPE;
 export const getAssetErrorType = getOnboardingErrorType;
 
@@ -115,6 +120,8 @@ export const optionalField = (object, key, predicate, field) => {
 };
 
 export const isString = value => typeof value === 'string';
+// 실제 계좌번호: 서버가 보장하는 14자리 숫자 문자열(앞자리 0 보존을 위해 문자열). Number 변환 금지.
+export const isAccountNumber = value => typeof value === 'string' && /^[0-9]{14}$/.test(value);
 export const isBoolean = value => typeof value === 'boolean';
 export const isFiniteNumber = value => typeof value === 'number' && Number.isFinite(value);
 

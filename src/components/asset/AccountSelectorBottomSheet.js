@@ -7,9 +7,10 @@ import {
   getAccountStatusNotice,
 } from '../../features/asset/assetScreenLogic';
 
-// 조회용 계좌 선택 시트다. ACTIVE/SUSPENDED/CLOSED 모두 고를 수 있고, 송금 출금 계좌 후보와는 무관하다
-// (송금 가능 여부는 canTransferFrom, 출금 계좌 결정은 TransferScreen이 따로 한다).
-// 서버에 은행명·실제 계좌번호가 없으므로 정적 계좌 라벨만 표시한다.
+// 조회용 계좌 선택 시트다. 기본은 ACTIVE/SUSPENDED/CLOSED 모두 고를 수 있다.
+// 송금 출금 계좌처럼 고를 수 있는 계좌를 제한해야 하면 호출하는 화면이 isSelectable 함수를 넘긴다
+// (송금 가능 여부 판단은 화면의 canTransferFrom이 하며, 시트는 판단하지 않는다).
+// 계좌 라벨(서버 은행명 기반, 없으면 "내 계좌")과 서버가 마스킹한 번호(maskedAccountNumber)만 표시한다. 전체 번호는 목록에 오지 않는다.
 
 export default function AccountSelectorBottomSheet({
   visible,
@@ -17,6 +18,8 @@ export default function AccountSelectorBottomSheet({
   selectedAccountId,
   onSelect,
   onClose,
+  title = '계좌 선택',
+  isSelectable,
 }) {
   const [mounted, setMounted] = useState(visible);
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -50,7 +53,7 @@ export default function AccountSelectorBottomSheet({
         <View style={styles.handle} />
 
         <View style={styles.header}>
-          <Text style={styles.title}>계좌 선택</Text>
+          <Text style={styles.title}>{title}</Text>
           <TouchableOpacity onPress={onClose} hitSlop={8}>
             <Feather name="x" size={22} color={redesign.textPrimary} />
           </TouchableOpacity>
@@ -60,12 +63,17 @@ export default function AccountSelectorBottomSheet({
 
         {(accounts ?? []).map(account => {
           const selected = account.id === selectedAccountId;
+          const selectable = typeof isSelectable === 'function' ? isSelectable(account) : true;
           return (
             <TouchableOpacity
               key={account.id}
               activeOpacity={0.8}
-              onPress={() => onSelect(account.id)}
-              style={styles.accountRow}
+              disabled={!selectable}
+              accessibilityState={{ disabled: !selectable, selected }}
+              onPress={() => {
+                if (selectable) onSelect(account.id);
+              }}
+              style={[styles.accountRow, !selectable && styles.accountRowDisabled]}
             >
               <View style={styles.accountInfo}>
                 <View style={styles.nameRow}>
@@ -76,6 +84,9 @@ export default function AccountSelectorBottomSheet({
                     </View>
                   ) : null}
                 </View>
+                {account.maskedAccountNumber ? (
+                  <Text style={styles.maskedNumber}>{account.maskedAccountNumber}</Text>
+                ) : null}
                 {getAccountStatusNotice(account) ? (
                   <Text style={styles.statusNotice}>{getAccountStatusNotice(account)}</Text>
                 ) : null}
@@ -141,6 +152,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: redesign.divider,
   },
+  accountRowDisabled: {
+    opacity: 0.45,
+  },
   accountInfo: {
     flex: 1,
     gap: 2,
@@ -158,6 +172,10 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 11,
+    color: redesign.textSecondary,
+  },
+  maskedNumber: {
+    fontSize: 13,
     color: redesign.textSecondary,
   },
   statusNotice: {

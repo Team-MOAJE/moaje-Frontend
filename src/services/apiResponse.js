@@ -147,6 +147,17 @@ const isTimeoutError = error =>
   error?.code === 'ETIMEDOUT' ||
   (error?.code === 'ECONNABORTED' && /timeout/i.test(error?.message ?? ''));
 
+// 5xx 오류 본문의 코드. { code }가 우선이고, Spring ProblemDetail(Asset의 502 ACCOUNT_NUMBER_UNAVAILABLE 등)은
+// 코드를 title에 담으므로 대문자 SNAKE_CASE 형태일 때만 title을 코드로 읽는다("Bad Gateway" 같은 일반 제목은 무시).
+const PROBLEM_TITLE_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
+const readServerErrorCode = body => {
+  if (!isPlainObject(body)) return null;
+  if (typeof body.code === 'string') return body.code;
+  return typeof body.title === 'string' && PROBLEM_TITLE_CODE_PATTERN.test(body.title)
+    ? body.title
+    : null;
+};
+
 // Axios 오류(또는 이미 정규화된 ApiError) → ApiError
 export const classifyAxiosError = error => {
   if (error instanceof ApiError) {
@@ -177,7 +188,7 @@ export const classifyAxiosError = error => {
       : createApiError({
           kind: API_ERROR_KIND.HTTP_5XX,
           status,
-          code: isPlainObject(body) && typeof body.code === 'string' ? body.code : null,
+          code: readServerErrorCode(body),
           traceId: readTraceId(body, headers),
         });
   }

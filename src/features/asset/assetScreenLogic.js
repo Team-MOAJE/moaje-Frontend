@@ -33,6 +33,100 @@ export const getAccountStatusNotice = account => ACCOUNT_STATUS_NOTICE[account?.
 // 송금 출금 계좌 후보는 ACTIVE만. SUSPENDED/CLOSED는 조회 전용이다.
 export const canTransferFrom = account => account?.status === 'ACTIVE';
 
+// ── 송금 금액 검증 (잔액 초과 방지) ────────────────────────────
+
+export const TRANSFER_AMOUNT_ISSUE = Object.freeze({
+  INVALID_AMOUNT: 'INVALID_AMOUNT', // 안전한 양의 정수가 아님(0·음수·소수·정밀도 초과)
+  NO_BALANCE_INFO: 'NO_BALANCE_INFO', // 정확한 잔액을 알 수 없음(balanceExact가 true인 안전 정수가 아님)
+  EXCEEDS_BALANCE: 'EXCEEDS_BALANCE', // 출금 계좌 잔액 초과
+});
+
+export const EXCEEDS_BALANCE_MESSAGE = '계좌 잔액을 초과하는 금액은 송금할 수 없어요.';
+export const AMOUNT_TOO_LARGE_MESSAGE = '입력할 수 없는 큰 금액이에요. 금액을 다시 입력해 주세요.';
+
+// 출금 계좌(서버 잔액) 기준으로 금액이 새 송금에 쓸 수 있는지 판정한다. 문제가 없으면 null.
+// 잔액을 정확히 알 수 없으면(balanceExact !== true, 비안전 정수) 송금 가능한 금액을 만들지 않는다.
+export const getTransferAmountIssue = ({ account, amount }) => {
+  if (!Number.isSafeInteger(amount) || amount <= 0) return TRANSFER_AMOUNT_ISSUE.INVALID_AMOUNT;
+  if (!account || account.balanceExact !== true || !Number.isSafeInteger(account.balance)) {
+    return TRANSFER_AMOUNT_ISSUE.NO_BALANCE_INFO;
+  }
+  return amount > account.balance ? TRANSFER_AMOUNT_ISSUE.EXCEEDS_BALANCE : null;
+};
+
+// 송금 완료 후 서버 잔액을 아직 확인하지 못한 계좌인지. 이 계좌의 목록 잔액은 최신으로 취급하지 않는다.
+export const isBalanceStale = (staleIds, accountId) =>
+  Array.isArray(staleIds) && typeof accountId === 'string' && staleIds.includes(accountId);
+
+export const BALANCE_CHECKING_MESSAGE = '계좌 잔액을 확인 중이에요.';
+export const BALANCE_CHECK_FAILED_MESSAGE =
+  '송금 후 잔액을 확인하지 못했어요. 잠시 후 계좌 화면에서 새로고침해 주세요.';
+
+// 송금 확인 직전 재검증(새 송금 전용 — 미확정 송금 재확인 경로에는 쓰지 않는다).
+// - state: 그 시점의 최신 Redux 루트 상태(렌더에서 캡처한 값이 아님).
+// - snapshot: 확인창을 연 시점의 송금 내용 { userId, sessionGeneration, accountId, amount, depositBankCode, depositAccountNumber }.
+// - current: 확인 시점의 화면 입력 { accountId, amount, depositBankCode, depositAccountNumber }.
+// 통과하면 null, 아니면 사유 문자열('CHANGED' | 'BLOCKED' | TRANSFER_AMOUNT_ISSUE 값).
+export const validateTransferAtConfirm = ({ state, snapshot, current }) => {
+  const userId = state?.auth?.user?.userId;
+  const asset = state?.asset;
+  if (!asset || !snapshot || !current) return 'CHANGED';
+  if (typeof userId !== 'string' || userId === '' || userId !== snapshot.userId) return 'CHANGED';
+  if (asset.sessionGeneration !== snapshot.sessionGeneration) return 'CHANGED';
+  for (const field of ['accountId', 'amount', 'depositBankCode', 'depositAccountNumber']) {
+    if (current[field] !== snapshot[field]) return 'CHANGED';
+  }
+  if (asset.transferLoading || asset.pendingTransfer != null) return 'BLOCKED';
+  // 송금 후 서버 잔액이 확인되기 전에는 목록 잔액으로 새 송금을 검증하지 않는다.
+  if (isBalanceStale(asset.staleBalanceAccountIds, snapshot.accountId)) return 'STALE_BALANCE';
+  const account = Array.isArray(asset.accounts)
+    ? asset.accounts.find(item => item.id === snapshot.accountId)
+    : undefined;
+  if (!canTransferFrom(account)) return 'CHANGED';
+  return getTransferAmountIssue({ account, amount: snapshot.amount });
+};
+
+// 계좌 상세: route accountId가 문자열이고 목록에 있을 때만 "적용 대기"다. 적용 직후 화면이
+// navigation.setParams({ accountId: undefined })로 소비하므로 이후 사용자 선택은 덮어쓰이지 않는다.
+// 목록에 없는 id는 적용하지 않는다. id는 문자열로만 비교한다(Number 변환 없음).
+export const hasPendingRouteSeed = (routeAccountId, accounts) =>
+  typeof routeAccountId === 'string' &&
+  Array.isArray(accounts) &&
+  accounts.some(account => account.id === routeAccountId);
+
+// 송금 화면의 fromAccountId param 식별값. 사용자 선택이 어느 param 상태에서 이루어졌는지 비교한다.
+export const transferFromParamKey = (hasFromParam, fromParam) =>
+  hasFromParam ? `param:${typeof fromParam === 'string' ? fromParam : ''}` : 'none';
+
+// 송금 출금 계좌 id 결정. 우선순위: 유효한 사용자 선택 > fromAccountId param > 고정(pinned) 기본 계좌.
+// userPick = { generation, id, paramKey } — 세션(sessionGeneration)이 같고 선택 당시와 param 상태가
+// 같을 때만 유효하다(새 param이 오거나 사용자가 바뀌면 이전 선택은 무효).
+export const resolveTransferFromId = ({
+  hasFromParam,
+  fromParam,
+  pinnedId,
+  userPick,
+  sessionGeneration,
+}) => {
+  const paramKey = transferFromParamKey(hasFromParam, fromParam);
+  const pickValid =
+    userPick != null &&
+    userPick.generation === sessionGeneration &&
+    userPick.paramKey === paramKey &&
+    typeof userPick.id === 'string' &&
+    userPick.id.length > 0;
+  if (pickValid) return { requestedFromId: userPick.id, fromParamValid: true, usingPick: true };
+  if (hasFromParam) {
+    const fromParamValid = typeof fromParam === 'string' && fromParam.trim().length > 0;
+    return {
+      requestedFromId: fromParamValid ? fromParam : null,
+      fromParamValid,
+      usingPick: false,
+    };
+  }
+  return { requestedFromId: pinnedId ?? null, fromParamValid: true, usingPick: false };
+};
+
 // 동기화 상태 표시. 정상(SYNCED)이거나 상세가 없으면 null. message는 서버 값 그대로만 쓴다.
 export const describeSyncStatus = detail => {
   if (!detail) return null;
@@ -60,14 +154,51 @@ export const resolveHomeAccountsState = ({ accounts, loading, error, fetched = t
   return fetched ? 'empty' : 'loading';
 };
 
-// 홈 행 모델. 은행명·토큰 필드는 없다. 총잔액 합산은 하지 않는다(서버 합계 API 없음).
-export const buildHomeAccountItems = accounts =>
+// 계좌 상세 제목. 목록 라벨(API-52 은행 정보 기반)을 기본으로 쓰고, 목록에는 은행 정보가 없는데
+// 같은 계좌의 상세(API-11/14)가 은행명을 주면 그 이름을 쓴다. 둘 다 없으면 목록의 중립 라벨을 유지한다.
+// 다른 계좌의 상세 은행명은 쓰지 않는다(호출부가 선택 계좌와 일치하는 상세만 넘긴다).
+export const resolveAccountTitle = (account, detail) => {
+  if (!account) return null;
+  if (account.bankName == null && typeof detail?.bankName === 'string' && detail.bankName !== '') {
+    return detail.bankName;
+  }
+  return account.label ?? null;
+};
+
+// 계좌번호: 실제 번호는 14자리 숫자 문자열(서버 보장). 표시용 하이픈은 화면 전용이며 복사값과 분리한다.
+const ACCOUNT_NUMBER_PATTERN = /^[0-9]{14}$/;
+
+// 표시용 포맷(4-4-6). 14자리 숫자가 아니면 null — 마스킹 번호·accountId·ACCOUNT-{id}를 포맷해 번호처럼 보이게 하지 않는다.
+export const formatAccountNumber = accountNumber =>
+  typeof accountNumber === 'string' && ACCOUNT_NUMBER_PATTERN.test(accountNumber)
+    ? `${accountNumber.slice(0, 4)}-${accountNumber.slice(4, 8)}-${accountNumber.slice(8)}`
+    : null;
+
+// 복사할 값 결정. 정규화된 상세(detail.accountId)가 현재 선택 계좌(selectedAccountId = 목록 id)와 같고,
+// accountNumber가 14자리 숫자일 때만 서버 원문 그대로 반환한다. 아니면 null(복사 불가).
+// accountId·maskedAccountNumber·표시용 하이픈 문자열은 절대 반환하지 않는다.
+export const getCopyableAccountNumber = (detail, selectedAccountId) =>
+  typeof selectedAccountId === 'string' &&
+  selectedAccountId !== '' &&
+  detail?.accountId === selectedAccountId &&
+  typeof detail.accountNumber === 'string' &&
+  ACCOUNT_NUMBER_PATTERN.test(detail.accountNumber)
+    ? detail.accountNumber
+    : null;
+
+// 홈 행 모델. 토큰 필드는 없다(은행명은 account.label에 이미 반영된다). 총잔액 합산은 하지 않는다(서버 합계 API 없음).
+// maskedAccountNumber는 서버(API-52)가 준 마스킹 번호만 전달한다(전체 번호는 목록에 없다).
+// staleBalanceIds에 든 계좌(송금 후 서버 잔액 미확인)는 이전 잔액 대신 '-'를 보여준다.
+export const buildHomeAccountItems = (accounts, staleBalanceIds = []) =>
   (Array.isArray(accounts) ? accounts : []).map(account => ({
     id: account.id,
     label: account.label,
+    maskedAccountNumber: account.maskedAccountNumber ?? null,
     status: account.status,
     statusLabel: getAccountStatusLabel(account),
-    balanceText: formatExactMoney(account.balance, account.balanceExact),
+    balanceText: isBalanceStale(staleBalanceIds, account.id)
+      ? '-'
+      : formatExactMoney(account.balance, account.balanceExact),
   }));
 
 // ── 거래 표시 ─────────────────────────────────────────────────

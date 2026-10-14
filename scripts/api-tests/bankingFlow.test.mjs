@@ -33,13 +33,16 @@ const OPEN_INPUT = {
   userName: '테스트',
   phoneNumber: '+821000000000',
   bankCode: '001',
+  bankName: '카카오뱅크',
   productName: 'MOAJE 입출금',
   initialBalance: 500000,
 };
 const openResponse = (overrides = {}) => ({
-  accountId: 777,
+  accountId: '777',
   userId: '101',
   bankCode: '001',
+  bankName: '카카오뱅크',
+  accountNumber: '12345678901234',
   productName: 'MOAJE 입출금',
   balance: 500000,
   status: 'ACTIVE',
@@ -55,7 +58,7 @@ const TRANSFER_INPUT = {
   amount: 10000,
 };
 const transferResponse = status => ({
-  transferId: 456,
+  transferId: '456',
   publicTransferId: 'MOAJE-BNK-456',
   status,
   message: '서버 문구(상태 판단에 쓰지 않음)',
@@ -90,7 +93,7 @@ test('API-09: 19자리 accountId를 문자열로 보존한다', async () => {
     'POST',
     ACCOUNTS_PATH,
     rawJsonRoute(
-      `{"accountId":${BIG_ACCOUNT_ID},"userId":"101","bankCode":"001","productName":"p","balance":0,"status":"ACTIVE","createdAt":"2026-10-13T03:00:00Z","canceledAt":null}`,
+      `{"accountId":"${BIG_ACCOUNT_ID}","userId":"101","bankCode":"001","bankName":"카카오뱅크","accountNumber":"12345678901234","productName":"p","balance":0,"status":"ACTIVE","createdAt":"2026-10-13T03:00:00Z","canceledAt":null}`,
       { status: 201 }
     )
   );
@@ -106,6 +109,8 @@ test('API-09: 필수값 누락·잘못된 값은 요청 자체를 보내지 않�
     { userName: undefined },
     { phoneNumber: '  ' },
     { bankCode: null },
+    { bankName: '' }, // 최신 명세: bankName 필수
+    { bankName: undefined },
     { productName: '' },
     { initialBalance: -1 },
     { initialBalance: 1.5 },
@@ -182,7 +187,7 @@ test('API-09: 동일 조합 중복 개설은 서버가 기존 계좌를 201로 �
 test('API-09: 개설 성공 후 목록 1회 재조회 — 반영이 지연돼 비어 있어도 자동 반복 조회하지 않는다', async () => {
   const store = makeStore();
   gateway.route('POST', ACCOUNTS_PATH, jsonRoute(openResponse(), { status: 201 }));
-  gateway.route('GET', LIST_PATH, rawJsonRoute('{"accounts":[]}')); // Kafka 반영 전
+  gateway.route('GET', LIST_PATH, rawJsonRoute('[]')); // Kafka 반영 전
   const opened = await store.dispatch(openAccount(OPEN_INPUT));
   assert.equal(openAccount.fulfilled.match(opened), true);
   await store.dispatch(fetchAccounts()); // 화면이 성공 확인 후 1회 호출하는 재조회
@@ -197,12 +202,16 @@ test('API-09: 개설 성공 후 목록 1회 재조회 — 반영이 지연돼 �
     'GET',
     LIST_PATH,
     rawJsonRoute(
-      `{"accounts":[{"accountId":"${BIG_ACCOUNT_ID}","balance":500000.0000,"status":"ACTIVE","syncStatus":"SYNC_REQUIRED","lastSyncedAt":null,"createdAt":"2026-10-13T03:00:00"}]}`
+      `[{"accountId":"${BIG_ACCOUNT_ID}","bankCode":"001","bankName":"카카오뱅크","balance":500000.0000,"status":"ACTIVE"}]`
     )
   );
   await store.dispatch(fetchAccounts());
   assert.equal(asset(store).accounts.length, 1);
   assert.equal(asset(store).accounts[0].id, BIG_ACCOUNT_ID);
+  assert.equal(asset(store).accounts[0].bankName, '카카오뱅크');
+  assert.equal(asset(store).accounts[0].label, '카카오뱅크');
+  assert.equal(asset(store).accounts[0].syncStatus, null, '제거된 필드는 만들지 않는다');
+  assert.equal(asset(store).accounts[0].createdAt, null);
 });
 
 test('API-09: 진행 중 로그아웃·사용자 전환 시 이전 응답이 새 세션 상태를 바꾸지 않는다', async () => {
@@ -235,7 +244,7 @@ test('API-10: COMPLETED만 완료이며 미확정 송금이 남지 않는다', a
   const [request] = gateway.requestsTo(TRANSFERS_PATH);
   assert.equal(isValidIdempotencyKey(request.headers['idempotency-key']), true);
   assert.deepEqual(request.body, {
-    withdrawalAccountId: Number(BIG_ACCOUNT_ID) /* 비교용: 정밀도 검증은 rawBody로 따로 한다 */,
+    withdrawalAccountId: BIG_ACCOUNT_ID, // 최신 명세: JSON 문자열(Number 변환 없음)
     depositBankCode: '001',
     depositAccountNumber: '00123456789012',
     amount: 10000,
@@ -243,16 +252,18 @@ test('API-10: COMPLETED만 완료이며 미확정 송금이 남지 않는다', a
   });
 });
 
-test('API-10: 출금 계좌 id는 숫자 리터럴 원문(19자리)으로, 입금 계좌번호는 앞자리 0을 보존한 문자열로 전송한다', async () => {
+test('API-10: 출금 계좌 id는 19자리 JSON 문자열로, 입금 계좌번호는 앞자리 0을 보존한 문자열로 전송한다', async () => {
   const store = makeStore();
   gateway.route('POST', TRANSFERS_PATH, transferRoute('COMPLETED'));
   await store.dispatch(transferFunds(TRANSFER_INPUT));
   const [request] = gateway.requestsTo(TRANSFERS_PATH);
-  assert.match(request.rawBody, new RegExp(`"withdrawalAccountId":${BIG_ACCOUNT_ID},`));
+  assert.match(request.rawBody, new RegExp(`"withdrawalAccountId":"${BIG_ACCOUNT_ID}",`));
   assert.match(request.rawBody, /"depositAccountNumber":"00123456789012"/);
   assert.match(request.rawBody, /"amount":10000[,}]/);
   // 서버 계약에 없는 필드는 보내지 않는다.
   assert.equal('memo' in request.body, false);
+  assert.equal('bankName' in request.body, false, '송금에는 수취 은행명을 보내지 않는다');
+  assert.equal('depositBankName' in request.body, false);
   assert.equal('toRecipient' in request.body, false);
   assert.equal('fromAccountId' in request.body, false);
 });

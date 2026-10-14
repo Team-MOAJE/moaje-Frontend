@@ -18,7 +18,7 @@ const NAVIGATOR = 'src/navigation/MainNavigator.js';
 test('개설 화면: bankingApi를 직접 쓰지 않고 openAccount thunk와 사용자 정보 기반 입력 빌더만 쓴다', () => {
   const source = code(OPEN);
   assert.match(source, /openAccount\(built\.input\)/);
-  assert.match(source, /buildOpenAccountInput\(\{ user, initialBalance \}\)/);
+  assert.match(source, /buildOpenAccountInput\(\{ user, initialBalance, bank: selectedBank \}\)/);
   assert.match(source, /state\.auth\.user/);
   assert.doesNotMatch(source, /bankingApi|apiClient|API_ENDPOINTS|fetch\(/);
   // CI 입력 UI·임의 CI 생성이 없다.
@@ -87,17 +87,74 @@ test('개설·송금 코드는 Auth/Work 모듈을 수정·호출하지 않는�
   }
 });
 
-test('송금 화면: 입금 은행·계좌번호는 숫자 문자열(앞자리 0 보존)로 다루고 서버에 없는 메모는 반영되지 않는다고 안내한다', () => {
+test('송금 화면: 받는 은행은 가상 은행 선택창으로 고르고 코드(문자열)만 요청에 담으며, 계좌번호는 숫자 문자열(앞자리 0 보존)이다', () => {
   const transfer = code('src/screens/asset/TransferScreen.js');
-  assert.match(transfer, /sanitizeDigits\(text\)/);
+  assert.match(transfer, /<BankSelectModal/);
+  assert.match(transfer, /getVirtualBankByCode\(depositBankCode\) !== null/);
   assert.match(transfer, /isValidDepositInput\(\{ depositBankCode, depositAccountNumber \}\)/);
+  assert.match(transfer, /sanitizeDigits\(text\)/);
+  assert.doesNotMatch(
+    transfer,
+    /DEMO_BANK_CODE|placeholder="입금 은행 코드"|handleDepositBankChange/
+  );
   assert.doesNotMatch(
     transfer,
     /Number\(\s*depositAccountNumber|parseInt\(\s*depositAccountNumber/
   );
-  assert.match(readSource('src/screens/asset/TransferScreen.js'), /송금에 반영되지 않아요/);
-  // 미확정 송금 중에는 입력란이 잠기고 저장된 요청 값을 보여준다.
+  // 요청에는 선택한 은행 코드만 전달한다(은행명·메모 추가 금지).
+  const submit = transfer.slice(
+    transfer.indexOf('submitTransfer({\n              withdrawalAccountId')
+  );
+  assert.match(submit, /depositBankCode,/);
+  assert.doesNotMatch(submit.slice(0, 400), /bankName|memo/);
+  // 미확정 송금 중에는 입력란과 은행 선택이 잠기고 저장된 요청 값을 보여준다.
+  assert.match(transfer, /disabled=\{hasPending \|\| transferLoading\}/);
   assert.match(transfer, /editable=\{!hasPending\}/);
+  assert.match(transfer, /pendingTransfer\.request\.depositBankCode/);
   assert.match(transfer, /pendingTransfer\.request\.depositAccountNumber/);
   assert.match(transfer, /disabled=\{!isActive\}/);
+});
+
+test('송금 화면: 메모 입력 UI(라벨·안내 문구·TextInput·상태·핸들러)가 완전히 제거됐고 Idempotency-Key 흐름은 유지된다', () => {
+  const raw = readSource('src/screens/asset/TransferScreen.js');
+  assert.doesNotMatch(raw, /메모|송금에 반영되지 않아요|memo|Memo|점심값|스터디 회비/);
+  const transfer = code('src/screens/asset/TransferScreen.js');
+  assert.match(transfer, /ensureIdempotencyKey\(pendingIdempotencyKeyRef\.current\)/);
+  assert.match(transfer, /idempotencyKey: getCurrentTransferKey\(\)/);
+  assert.match(transfer, /recheckPending: true/);
+});
+
+test('송금 화면: 출금 계좌 라벨은 서버 은행 정보로 만든 계좌 라벨을 쓴다', () => {
+  const transfer = code('src/screens/asset/TransferScreen.js');
+  assert.match(transfer, /selectedAccount\.label \?\? '내 계좌'/);
+});
+
+test('개설 화면: 은행 코드 고정 표시가 은행 선택으로 바뀌었고 BankSelectModal을 재사용한다', () => {
+  const source = code(OPEN);
+  const raw = readSource(OPEN);
+  assert.match(source, /<BankSelectModal/);
+  assert.match(source, /useState\(null\)/);
+  assert.match(raw, /은행을 선택해 주세요/);
+  assert.doesNotMatch(source, /DEMO_BANK_CODE/);
+  assert.doesNotMatch(raw, /은행 코드/);
+  // 요청 중에는 은행 변경과 중복 요청이 막힌다.
+  assert.match(source, /openAccountLoading \|\| submittingRef\.current/);
+  assert.match(source, /disabled=\{openAccountLoading\}/);
+  // 선택 결과는 저장하지 않는다.
+  assert.doesNotMatch(source, /AsyncStorage|SecureStore|persist/);
+});
+
+test('은행 선택창: 가상 은행 단일 목록을 사용하고 은행 목록을 중복 정의하지 않는다', () => {
+  const modal = code('src/components/asset/BankSelectModal.js');
+  assert.match(modal, /VIRTUAL_BANKS\.map/);
+  assert.match(modal, /onSelect\(\{ bankCode: bank\.bankCode, bankName: bank\.bankName \}\)/);
+  assert.match(modal, /maxHeight: listMaxHeight/);
+  for (const file of [
+    'src/components/asset/BankSelectModal.js',
+    OPEN,
+    'src/screens/asset/TransferScreen.js',
+    'src/features/asset/accountOpenInput.js',
+  ]) {
+    assert.doesNotMatch(code(file), /카카오뱅크|토스뱅크|KB국민은행|신한은행/, file);
+  }
 });

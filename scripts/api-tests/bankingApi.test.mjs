@@ -31,6 +31,7 @@ const openInput = (overrides = {}) => ({
   userName: '테스트',
   phoneNumber: '01000000000',
   bankCode: '001',
+  bankName: '카카오뱅크',
   productName: '입출금통장',
   initialBalance: 100000,
   ...overrides,
@@ -45,9 +46,11 @@ const transferInput = (overrides = {}) => ({
 });
 
 const openFixture = (overrides = {}) => ({
-  accountId: 123,
+  accountId: '123',
   userId: '123',
   bankCode: '001',
+  bankName: '카카오뱅크',
+  accountNumber: '12345678901234',
   productName: '입출금통장',
   balance: 100000,
   status: 'ACTIVE',
@@ -57,7 +60,7 @@ const openFixture = (overrides = {}) => ({
 });
 
 const transferFixture = (overrides = {}) => ({
-  transferId: 456,
+  transferId: '456',
   publicTransferId: 'MOAJE-BNK-20261011-ABC',
   status: 'COMPLETED',
   message: '송금이 완료되었습니다.',
@@ -89,6 +92,8 @@ test('API-09: POST, Bearer, 명세 키 이름 본문(userId 미전송), 멱등 �
     accountId: '123',
     userId: '123',
     bankCode: '001',
+    bankName: '카카오뱅크',
+    accountNumber: '12345678901234',
     productName: '입출금통장',
     balance: 100000,
     status: 'ACTIVE',
@@ -102,12 +107,43 @@ test('API-09: 19자리 accountId 응답을 정밀도 손실 없이 문자열로 
     'POST',
     ACCOUNTS_PATH,
     rawJsonRoute(
-      `{"accountId":${BIG_ACCOUNT_ID},"userId":"123","bankCode":"001","productName":"p","balance":0,"status":"ACTIVE","createdAt":"2026-10-11T03:00:00Z","canceledAt":null}`,
+      `{"accountId":"${BIG_ACCOUNT_ID}","userId":"123","bankCode":"001","bankName":"카카오뱅크","accountNumber":"00123456789012","productName":"p","balance":0,"status":"ACTIVE","createdAt":"2026-10-11T03:00:00Z","canceledAt":null}`,
       { status: 201 }
     )
   );
   const account = await openBankingAccount(openInput({ initialBalance: 0 }));
   assert.equal(account.accountId, BIG_ACCOUNT_ID);
+
+  // 구 서버처럼 JSON 숫자로 와도 반올림 없이 보존한다.
+  gateway.route(
+    'POST',
+    ACCOUNTS_PATH,
+    rawJsonRoute(
+      `{"accountId":${BIG_ACCOUNT_ID},"userId":"123","bankCode":"001","accountNumber":"00123456789012","productName":"p","balance":0,"status":"ACTIVE","createdAt":"2026-10-11T03:00:00Z","canceledAt":null}`,
+      { status: 201 }
+    )
+  );
+  const legacy = await openBankingAccount(openInput({ initialBalance: 0 }));
+  assert.equal(legacy.accountId, BIG_ACCOUNT_ID);
+  assert.equal(legacy.bankName, null, 'bankName 키가 없으면 null');
+});
+
+test('API-09: 요청 본문에 bankCode와 bankName이 함께 전송되고 선택 은행별로 값이 달라진다', async () => {
+  gateway.route('POST', ACCOUNTS_PATH, jsonRoute(openFixture(), { status: 201 }));
+
+  await openBankingAccount(openInput({ bankCode: '008', bankName: '토스뱅크' }));
+
+  const [request] = gateway.requestsTo(ACCOUNTS_PATH);
+  assert.equal(request.body.bankCode, '008', '앞자리 0을 보존한 문자열');
+  assert.equal(request.body.bankName, '토스뱅크');
+  assert.equal(typeof request.body.bankCode, 'string');
+});
+
+test('API-09: 응답의 bankName이 null이어도 정상(null)이다', async () => {
+  gateway.route('POST', ACCOUNTS_PATH, jsonRoute(openFixture({ bankName: null }), { status: 201 }));
+  const account = await openBankingAccount(openInput());
+  assert.equal(account.bankName, null);
+  assert.equal(account.bankCode, '001');
 });
 
 test('API-09: 응답 형식 위반 → invalidResponse (id·status·balance·필수 필드)', async () => {
@@ -118,6 +154,7 @@ test('API-09: 응답 형식 위반 → invalidResponse (id·status·balance·필
     openFixture({ status: 'OPEN' }),
     openFixture({ balance: '100000' }),
     openFixture({ bankCode: '' }),
+    openFixture({ bankName: 123 }),
     [],
   ]) {
     gateway.route('POST', ACCOUNTS_PATH, jsonRoute(body, { status: 201 }));
@@ -131,6 +168,11 @@ test('API-09: 요청 입력 검증 실패는 네트워크 요청 없이 거부, 
   for (const bad of [
     openInput({ ci: '' }),
     openInput({ phoneNumber: 12345 }),
+    openInput({ bankName: '' }), // 최신 명세: bankName 필수
+    openInput({ bankName: undefined }),
+    openInput({ bankName: 12 }),
+    openInput({ bankName: 'ㄱ'.repeat(101) }), // 100자 초과
+    openInput({ bankCode: '1'.repeat(21) }), // 20자 초과
     openInput({ initialBalance: -1 }),
     openInput({ initialBalance: 1.5 }),
     openInput({ initialBalance: '100' }),
@@ -146,7 +188,7 @@ test('API-09: 요청 입력 검증 실패는 네트워크 요청 없이 거부, 
 
 // ── API-10 ───────────────────────────────────────────────────
 
-test('API-10: 본문 키 이름·withdrawalAccountId 숫자 리터럴 원문·currency 기본 KRW·Idempotency-Key 헤더', async () => {
+test('API-10: 본문 키 이름·withdrawalAccountId JSON 문자열·currency 기본 KRW·Idempotency-Key 헤더', async () => {
   gateway.route('POST', TRANSFERS_PATH, jsonRoute(transferFixture()));
 
   const { transfer, idempotencyKey } = await requestTransfer(transferInput());
@@ -159,9 +201,17 @@ test('API-10: 본문 키 이름·withdrawalAccountId 숫자 리터럴 원문·cu
   assert.ok(isValidIdempotencyKey(idempotencyKey));
   assert.equal(
     request.rawBody,
-    `{"withdrawalAccountId":${BIG_ACCOUNT_ID},"depositBankCode":"001","depositAccountNumber":"TEST-RECIPIENT-001","amount":10000,"currency":"KRW"}`,
-    '출금 계좌 id는 숫자 리터럴 원문(문자열 아님, 반올림 없음)'
+    `{"withdrawalAccountId":"${BIG_ACCOUNT_ID}","depositBankCode":"001","depositAccountNumber":"TEST-RECIPIENT-001","amount":10000,"currency":"KRW"}`,
+    '출금 계좌 id는 최신 명세대로 JSON 문자열(반올림 없음), 은행명·메모 필드 없음'
   );
+  assert.equal(typeof request.body.withdrawalAccountId, 'string');
+  assert.deepEqual(Object.keys(request.body), [
+    'withdrawalAccountId',
+    'depositBankCode',
+    'depositAccountNumber',
+    'amount',
+    'currency',
+  ]);
 
   assert.deepEqual(transfer, {
     transferId: '456',
@@ -200,7 +250,7 @@ test('API-10: 응답 형식 위반(알 수 없는 status·id·message 누락) �
     transferFixture({ status: 'DONE' }),
     transferFixture({ transferId: 'x' }),
     transferFixture({ publicTransferId: '' }),
-    { transferId: 1, publicTransferId: 'p', status: 'COMPLETED' },
+    { transferId: '1', publicTransferId: 'p', status: 'COMPLETED' },
     {},
   ]) {
     gateway.route('POST', TRANSFERS_PATH, jsonRoute(body));
@@ -286,4 +336,26 @@ test('토큰이 없으면 401 → UNAUTHORIZED (API-09/10)', async () => {
 test('실제 서버 미호출: 모든 요청 목적지는 모의 Gateway(127.0.0.1)뿐', () => {
   assert.ok(everRequested.length > 0);
   assert.ok(everRequested.every(entry => entry.host === '127.0.0.1'));
+});
+
+test('API-09: accountNumber는 14자리 숫자 문자열 그대로(앞자리 0 보존) 매핑되고, 없거나 형식이 다르면 응답 오류다', async () => {
+  gateway.route(
+    'POST',
+    ACCOUNTS_PATH,
+    jsonRoute(openFixture({ accountNumber: '00123456789012' }), { status: 201 })
+  );
+  const account = await openBankingAccount(openInput());
+  assert.equal(account.accountNumber, '00123456789012');
+  assert.equal(typeof account.accountNumber, 'string');
+
+  for (const bad of [undefined, null, 12345678901234, '1234', '1234-5678-901234', '*****1234']) {
+    const fixture = openFixture();
+    if (bad === undefined) delete fixture.accountNumber;
+    else fixture.accountNumber = bad;
+    gateway.route('POST', ACCOUNTS_PATH, jsonRoute(fixture, { status: 201 }));
+    await assert.rejects(
+      () => openBankingAccount(openInput()),
+      error => error.invalidResponse === true && error.invalidField === 'openAccount.accountNumber'
+    );
+  }
 });

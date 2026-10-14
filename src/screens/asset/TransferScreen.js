@@ -12,19 +12,31 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useSelector, useDispatch } from 'react-redux';
-import { redesign } from '../../theme';
+import { useSelector, useDispatch, useStore } from 'react-redux';
+import { colors, redesign } from '../../theme';
 import { ROUTES } from '../../constants/routes';
 import BottomNavBar from '../../components/home/BottomNavBar';
+import BankSelectModal from '../../components/asset/BankSelectModal';
+import AccountSelectorBottomSheet from '../../components/asset/AccountSelectorBottomSheet';
 import { formatKRW } from '../../utils/formatMoney';
 import { fetchAccounts, transferFunds } from '../../features/asset/assetApi';
+import { accountDataInvalidated } from '../../features/asset/assetSlice';
 import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
 import { ensureIdempotencyKey } from '../../utils/idempotencyKey';
 import {
+  AMOUNT_TOO_LARGE_MESSAGE,
+  BALANCE_CHECKING_MESSAGE,
+  EXCEEDS_BALANCE_MESSAGE,
+  TRANSFER_AMOUNT_ISSUE,
   canTransferFrom,
   formatExactMoney,
   getAccountStatusLabel,
+  getTransferAmountIssue,
+  isBalanceStale,
   resolveHomeAccountsState,
+  resolveTransferFromId,
+  transferFromParamKey,
+  validateTransferAtConfirm,
 } from '../../features/asset/assetScreenLogic';
 import {
   TRANSFER_ERROR_OUTCOME,
@@ -37,25 +49,29 @@ import {
   isValidDepositInput,
   sanitizeDigits,
 } from '../../features/asset/transferOutcome';
-import { DEMO_BANK_CODE } from '../../features/asset/accountOpenInput';
+import { getVirtualBankByCode } from '../../features/asset/virtualBanks';
 
 const QUICK_AMOUNTS = [10000, 50000, 100000];
 
 const PLACEHOLDER_COLOR = '#C4C4BF';
+const BANK_PLACEHOLDER = '받는 은행을 선택해 주세요';
 
 export default function TransferScreen({ navigation, route }) {
   const dispatch = useDispatch();
+  const store = useStore();
   const accounts = useSelector(state => state.asset.accounts);
   const accountsLoading = useSelector(state => state.asset.accountsLoading);
   const accountsError = useSelector(state => state.asset.accountsError);
   const sessionGeneration = useSelector(state => state.asset.sessionGeneration);
+  const staleBalanceAccountIds = useSelector(state => state.asset.staleBalanceAccountIds);
   const transferLoading = useSelector(state => state.asset.transferLoading);
   // 결과가 확정되지 않은 송금(처리 중 / 결과 확인 불가). 있으면 새 송금은 막고 같은 요청만 다시 확인한다.
   const pendingTransfer = useSelector(state => state.asset.pendingTransfer);
   const hasPending = pendingTransfer != null;
   const pendingNotice = describePendingTransfer(pendingTransfer);
 
-  // 출금 계좌 결정 (다른 계좌로 조용히 대체하지 않는다. 새 선택 UI는 없다).
+  // 출금 계좌 결정 (다른 계좌로 조용히 대체하지 않는다).
+  // - 사용자가 출금 계좌 선택창에서 고른 계좌(userPick)가 최우선이다. 선택 당시와 같은 세션·같은 param 상태일 때만 유효하다.
   // - fromAccountId 파라미터가 "있으면" 그 값만 사용한다. 문자열이 아니거나 빈 값이거나, 목록에 없거나, ACTIVE가 아니면 차단.
   // - 파라미터가 아예 없을 때만 일반 진입이며, 최초로 유효한 ACTIVE 계좌 1개의 id를 이 화면 세션 동안 고정한다.
   //   고정값은 id 문자열과 sessionGeneration뿐이다(계좌 객체·잔액은 복사하지 않고 매 렌더 Redux 목록으로 검증).
@@ -65,6 +81,8 @@ export default function TransferScreen({ navigation, route }) {
   const fromParam = hasFromParam ? routeParams.fromAccountId : null;
   const [pinned, setPinned] = useState(null);
   const pinnedId = pinned && pinned.generation === sessionGeneration ? pinned.id : null;
+  const [userPick, setUserPick] = useState(null);
+  const [fromSheetVisible, setFromSheetVisible] = useState(false);
 
   useEffect(() => {
     if (hasFromParam) return;
@@ -73,14 +91,13 @@ export default function TransferScreen({ navigation, route }) {
     if (first) setPinned({ generation: sessionGeneration, id: first.id });
   }, [hasFromParam, pinned, sessionGeneration, accounts]);
 
-  let requestedFromId = null;
-  let fromParamValid = true;
-  if (hasFromParam) {
-    fromParamValid = typeof fromParam === 'string' && fromParam.trim().length > 0;
-    requestedFromId = fromParamValid ? fromParam : null;
-  } else {
-    requestedFromId = pinnedId;
-  }
+  const { requestedFromId, fromParamValid } = resolveTransferFromId({
+    hasFromParam,
+    fromParam,
+    pinnedId,
+    userPick,
+    sessionGeneration,
+  });
   const requestedAccount =
     requestedFromId == null ? null : (accounts.find(a => a.id === requestedFromId) ?? null);
   const selectedAccount = canTransferFrom(requestedAccount) ? requestedAccount : null;
@@ -103,7 +120,11 @@ export default function TransferScreen({ navigation, route }) {
     accountViewKind = selectDefaultAccount(accounts) ? 'loading' : 'noActive';
   }
 
+  // 송금 후 서버 잔액을 아직 확인하지 못한 출금 계좌: 목록의 이전 잔액으로 새 송금을 검증·전액 입력하지 않는다.
+  const isSelectedStale = isBalanceStale(staleBalanceAccountIds, selectedAccount?.id);
+
   const maxAmount =
+    !isSelectedStale &&
     selectedAccount &&
     selectedAccount.balanceExact === true &&
     Number.isSafeInteger(selectedAccount.balance) &&
@@ -116,16 +137,27 @@ export default function TransferScreen({ navigation, route }) {
       : null;
 
   const [amount, setAmount] = useState(0);
-  const [depositBankCode, setDepositBankCode] = useState(DEMO_BANK_CODE);
+  // 안전 정수 범위를 넘는 입력(숫자 문자열). 있으면 amount는 0으로 두어 송금을 막고 입력 오류를 보여준다.
+  const [amountOverflow, setAmountOverflow] = useState(null);
+  // 받는 은행: 가상 은행 목록에서 고른 코드(문자열). 미선택이면 빈 문자열이며 송금이 차단된다. 요청에는 코드만 보낸다.
+  const [depositBankCode, setDepositBankCode] = useState('');
   const [depositAccountNumber, setDepositAccountNumber] = useState('');
-  const [memo, setMemo] = useState(''); // 서버 송금 요청에 없는 값이라 전송하지 않는다.
+  const [bankModalVisible, setBankModalVisible] = useState(false);
 
   // 미확정 송금이 있으면 입력란은 그 요청의 값을 보여주고 잠근다(새 의도로 바뀌지 않게).
   const shownAmount = hasPending ? pendingTransfer.request.amount : amount;
+  const shownAmountText =
+    !hasPending && amountOverflow !== null
+      ? amountOverflow
+      : shownAmount === 0
+        ? ''
+        : shownAmount.toLocaleString('ko-KR');
   const shownBankCode = hasPending ? pendingTransfer.request.depositBankCode : depositBankCode;
   const shownAccountNumber = hasPending
     ? pendingTransfer.request.depositAccountNumber
     : depositAccountNumber;
+  const shownBankName = getVirtualBankByCode(shownBankCode)?.bankName ?? null;
+  const bankLabel = shownBankName ?? (shownBankCode === '' ? null : shownBankCode);
 
   // 한 번 확정된 송금 요청에 대한 멱등성 키 — 자동 재시도 시 동일 키 재사용
   const pendingIdempotencyKeyRef = useRef(null);
@@ -139,8 +171,32 @@ export default function TransferScreen({ navigation, route }) {
     pendingIdempotencyKeyRef.current = null;
   };
 
+  // 확인 시점의 화면 입력(매 렌더 갱신). 확인창을 연 때의 송금 내용과 비교해 달라졌으면 보내지 않는다.
+  const currentIntentRef = useRef(null);
+  currentIntentRef.current = {
+    accountId: selectedAccount?.id ?? null,
+    amount,
+    depositBankCode,
+    depositAccountNumber,
+  };
+
+  // 새 송금 금액 검증(선택한 출금 계좌의 서버 잔액 기준). 매 렌더 다시 계산하므로 출금 계좌를 바꾸면 자동 재검증된다.
+  // 입력값은 바꾸지 않고 판정만 한다. 0원(빈 입력)은 오류 문구 없이 버튼만 비활성이다.
+  const amountIssue = getTransferAmountIssue({ account: selectedAccount, amount });
+  let amountError = null;
+  if (!hasPending) {
+    if (amountOverflow !== null) amountError = AMOUNT_TOO_LARGE_MESSAGE;
+    else if (amountIssue === TRANSFER_AMOUNT_ISSUE.EXCEEDS_BALANCE) {
+      amountError = EXCEEDS_BALANCE_MESSAGE;
+    }
+  }
+
   const isNewTransferActive =
     amount > 0 &&
+    amountOverflow === null &&
+    amountIssue === null &&
+    !isSelectedStale &&
+    getVirtualBankByCode(depositBankCode) !== null &&
     isValidDepositInput({ depositBankCode, depositAccountNumber }) &&
     !accountsLoading &&
     !transferLoading &&
@@ -162,27 +218,70 @@ export default function TransferScreen({ navigation, route }) {
   // 입력 잠금: 미확정 송금이 있는 동안에는 값을 바꾸지 않는다(키를 새로 만들어 새 송금을 보내는 경로 차단).
   const handleAmountChange = text => {
     if (hasPending) return;
-    const n = parseInt(text.replace(/[^0-9]/g, '') || '0', 10);
-    setAmount(n);
+    const digits = text.replace(/[^0-9]/g, '');
+    const n = parseInt(digits || '0', 10);
+    if (Number.isSafeInteger(n)) {
+      setAmountOverflow(null);
+      setAmount(n);
+    } else {
+      // 정밀도를 잃는 값은 0원으로 두어 송금을 막고, 입력한 숫자는 그대로 보여 오류를 알린다.
+      setAmountOverflow(digits);
+      setAmount(0);
+    }
     clearPendingTransferKey();
   };
 
   const handleQuickAmount = add => {
     if (hasPending) return;
-    setAmount(prev => prev + add);
+    const next = amount + add;
+    if (amountOverflow === null && Number.isSafeInteger(next)) {
+      setAmount(next);
+    } else {
+      // 입력 오류 상태이거나 합이 안전 정수를 넘으면 금액을 만들지 않고 오류 상태로 둔다.
+      setAmountOverflow(amountOverflow ?? (BigInt(amount) + BigInt(add)).toString());
+      setAmount(0);
+    }
     clearPendingTransferKey();
   };
 
   // 정확한 잔액(balanceExact=true인 안전한 양의 정수)일 때만 전액을 입력한다. 그 외에는 아무것도 하지 않는다.
   const handleMaxAmount = () => {
     if (hasPending || maxAmount == null) return;
+    setAmountOverflow(null);
     setAmount(maxAmount);
     clearPendingTransferKey();
   };
 
-  const handleDepositBankChange = text => {
-    if (hasPending) return;
-    setDepositBankCode(sanitizeDigits(text));
+  // 출금 계좌 변경: 송금 요청 진행 중이거나 미확정 송금이 있으면 바꾸지 않는다.
+  // 미전송 요청의 키만 새로 만들게 비우고, 이미 전송했거나 결과가 불확실한 요청의 키·pendingTransfer는 건드리지 않는다.
+  const handleFromAccountPress = () => {
+    if (hasPending || transferLoading) return;
+    setFromSheetVisible(true);
+  };
+
+  const handleFromAccountSelect = id => {
+    if (hasPending || transferLoading) return;
+    setFromSheetVisible(false);
+    if (id === selectedAccount?.id) return;
+    if (!canTransferFrom(accounts.find(account => account.id === id))) return;
+    setUserPick({
+      generation: sessionGeneration,
+      id,
+      paramKey: transferFromParamKey(hasFromParam, fromParam),
+    });
+    clearPendingTransferKey();
+  };
+
+  const handleBankPress = () => {
+    if (hasPending || transferLoading) return;
+    setBankModalVisible(true);
+  };
+
+  // 요청에는 선택한 은행 코드만 담긴다. 서버 계약에 없는 값(은행명 등)은 보내지 않는다.
+  const handleDepositBankSelect = bank => {
+    if (hasPending || transferLoading) return;
+    setBankModalVisible(false);
+    setDepositBankCode(bank.bankCode);
     clearPendingTransferKey();
   };
 
@@ -190,10 +289,6 @@ export default function TransferScreen({ navigation, route }) {
     if (hasPending) return;
     setDepositAccountNumber(sanitizeDigits(text));
     clearPendingTransferKey();
-  };
-
-  const handleMemoChange = text => {
-    setMemo(text); // 요청 본문에 없으므로 송금 의도(멱등성 키)에 영향이 없다.
   };
 
   // 응답으로 확정된 결과만 성공으로 안내한다. 처리 중·결과 확인 불가는 완료로 표시하지 않는다.
@@ -207,6 +302,8 @@ export default function TransferScreen({ navigation, route }) {
       if (outcome === TRANSFER_OUTCOME.COMPLETED) {
         clearPendingTransferKey();
         Alert.alert(notice.title, notice.message);
+        // 확정된 송금 이후에만: 이전 잔액·상세·거래를 무효화하고 서버에서 다시 받는다(재조회 실패가 송금 결과를 바꾸지 않는다).
+        dispatch(accountDataInvalidated());
         dispatch(fetchAccounts());
         navigation.goBack();
         return;
@@ -237,21 +334,50 @@ export default function TransferScreen({ navigation, route }) {
       return;
     }
     if (!canTransferFrom(selectedAccount)) return;
+    // 확인창을 열 때의 송금 내용. 확인 버튼 시점에 최신 Redux 상태·화면 입력과 다시 대조한다(새 송금 전용).
+    const snapshot = {
+      userId: store.getState().auth?.user?.userId,
+      sessionGeneration: store.getState().asset.sessionGeneration,
+      accountId: selectedAccount.id,
+      amount,
+      depositBankCode,
+      depositAccountNumber,
+    };
+    const blockIfInvalid = () => {
+      const reason = validateTransferAtConfirm({
+        state: store.getState(),
+        snapshot,
+        current: currentIntentRef.current,
+      });
+      if (reason === null) return false;
+      Alert.alert(
+        '송금할 수 없어요',
+        reason === TRANSFER_AMOUNT_ISSUE.EXCEEDS_BALANCE
+          ? EXCEEDS_BALANCE_MESSAGE
+          : reason === 'STALE_BALANCE'
+            ? BALANCE_CHECKING_MESSAGE
+            : '송금 정보가 바뀌었거나 확인할 수 없어 송금하지 않았어요. 내용을 다시 확인해 주세요.'
+      );
+      return true;
+    };
+    if (blockIfInvalid()) return;
     Alert.alert(
       '확인',
-      `${depositBankCode}-${depositAccountNumber} 계좌로 ${formatKRW(amount)}을 송금할까요?`,
+      `${getVirtualBankByCode(depositBankCode).bankName} ${depositAccountNumber} 계좌로 ${formatKRW(amount)}을 송금할까요?`,
       [
         { text: '취소', style: 'cancel' },
         {
           text: '확인',
-          onPress: () =>
+          onPress: () => {
+            if (blockIfInvalid()) return;
             submitTransfer({
               withdrawalAccountId: selectedAccount.id,
               depositBankCode,
               depositAccountNumber,
               amount,
               idempotencyKey: getCurrentTransferKey(),
-            }),
+            });
+          },
         },
       ]
     );
@@ -288,15 +414,30 @@ export default function TransferScreen({ navigation, route }) {
               <Text style={styles.accountLabel}>출금 계좌</Text>
               {accountViewKind === 'ready' ? (
                 <>
-                  <View style={styles.accountRow}>
+                  <Pressable
+                    onPress={handleFromAccountPress}
+                    disabled={hasPending || transferLoading}
+                    accessibilityRole="button"
+                    accessibilityLabel="출금 계좌 선택"
+                    accessibilityState={{ disabled: hasPending || transferLoading }}
+                    style={({ pressed }) => [styles.accountRow, pressed && styles.pressed]}
+                  >
                     <Text style={styles.accountBank}>{selectedAccount.label ?? '내 계좌'}</Text>
-                  </View>
+                    {!(hasPending || transferLoading) && (
+                      <Feather name="chevron-down" size={20} color={redesign.textSecondary} />
+                    )}
+                  </Pressable>
                   <Text style={styles.balance}>
                     현재 잔액{' '}
                     <Text style={styles.balanceValue}>
-                      {formatExactMoney(selectedAccount.balance, selectedAccount.balanceExact)}
+                      {isSelectedStale && !hasPending
+                        ? '-'
+                        : formatExactMoney(selectedAccount.balance, selectedAccount.balanceExact)}
                     </Text>
                   </Text>
+                  {isSelectedStale && !hasPending ? (
+                    <Text style={styles.balance}>{BALANCE_CHECKING_MESSAGE}</Text>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -316,6 +457,21 @@ export default function TransferScreen({ navigation, route }) {
                         : '선택한 출금 계좌를 찾을 수 없어요.'}
                     </Text>
                   )}
+                  {accountViewKind === 'fromInvalid' && (
+                    <Pressable
+                      onPress={handleFromAccountPress}
+                      disabled={hasPending || transferLoading}
+                      accessibilityRole="button"
+                      accessibilityLabel="출금 계좌 선택"
+                      style={({ pressed }) => [
+                        styles.quickBtn,
+                        styles.retryBtn,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.quickBtnText}>다른 계좌 선택</Text>
+                    </Pressable>
+                  )}
                   {accountViewKind === 'error' && (
                     <Pressable
                       onPress={handleRetryAccounts}
@@ -334,20 +490,27 @@ export default function TransferScreen({ navigation, route }) {
               )}
             </View>
 
-            {/* 받는 계좌 (입금 은행 코드 + 계좌번호, 숫자 문자열) */}
+            {/* 받는 계좌 (받는 은행 선택 + 계좌번호, 숫자 문자열) */}
             <View style={styles.section}>
               <Text style={styles.question}>누구에게 보낼까요?</Text>
-              <TextInput
-                style={styles.lineInput}
-                placeholder="입금 은행 코드"
-                placeholderTextColor={PLACEHOLDER_COLOR}
-                keyboardType="number-pad"
-                maxLength={20}
-                editable={!hasPending}
-                value={shownBankCode}
-                onChangeText={handleDepositBankChange}
-                returnKeyType="next"
-              />
+              <Pressable
+                onPress={handleBankPress}
+                disabled={hasPending || transferLoading}
+                accessibilityRole="button"
+                accessibilityLabel="받는 은행 선택"
+                accessibilityState={{ disabled: hasPending || transferLoading }}
+                style={({ pressed }) => [styles.bankSelect, pressed && styles.pressed]}
+              >
+                <Text
+                  style={[
+                    styles.bankSelectText,
+                    bankLabel === null && styles.bankSelectPlaceholder,
+                  ]}
+                >
+                  {bankLabel ?? BANK_PLACEHOLDER}
+                </Text>
+                <Feather name="chevron-down" size={20} color={redesign.textSecondary} />
+              </Pressable>
               <TextInput
                 style={styles.lineInput}
                 placeholder="입금 계좌번호 (숫자만)"
@@ -369,13 +532,18 @@ export default function TransferScreen({ navigation, route }) {
                   style={styles.amountInput}
                   keyboardType="number-pad"
                   editable={!hasPending}
-                  value={shownAmount === 0 ? '' : shownAmount.toLocaleString('ko-KR')}
+                  value={shownAmountText}
                   onChangeText={handleAmountChange}
                   placeholder="0"
                   placeholderTextColor={PLACEHOLDER_COLOR}
                 />
                 <Text style={styles.amountUnit}>원</Text>
               </View>
+              {amountError ? (
+                <Text style={styles.amountError} accessibilityLiveRegion="polite">
+                  {amountError}
+                </Text>
+              ) : null}
               <View style={styles.quickRow}>
                 {QUICK_AMOUNTS.map(add => (
                   <Pressable
@@ -416,19 +584,6 @@ export default function TransferScreen({ navigation, route }) {
               </View>
             </View>
 
-            {/* 메모 */}
-            <View style={styles.section}>
-              <Text style={styles.question}>메모 (송금에 반영되지 않아요)</Text>
-              <TextInput
-                style={styles.lineInput}
-                placeholder="예: 점심값, 교재비, 스터디 회비"
-                placeholderTextColor={PLACEHOLDER_COLOR}
-                value={memo}
-                onChangeText={handleMemoChange}
-                returnKeyType="done"
-              />
-            </View>
-
             {/* 하단 송금 버튼 */}
             <Pressable
               onPress={handleTransferPress}
@@ -452,6 +607,24 @@ export default function TransferScreen({ navigation, route }) {
             </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
+
+        <AccountSelectorBottomSheet
+          visible={fromSheetVisible}
+          title="출금 계좌 선택"
+          accounts={accounts}
+          selectedAccountId={selectedAccount?.id ?? null}
+          isSelectable={canTransferFrom}
+          onSelect={handleFromAccountSelect}
+          onClose={() => setFromSheetVisible(false)}
+        />
+
+        <BankSelectModal
+          visible={bankModalVisible}
+          title="받는 은행 선택"
+          selectedBankCode={shownBankCode === '' ? null : shownBankCode}
+          onSelect={handleDepositBankSelect}
+          onClose={() => setBankModalVisible(false)}
+        />
 
         <BottomNavBar
           onHomePress={handleBottomHomePress}
@@ -528,6 +701,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: redesign.textPrimary,
   },
+  bankSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    marginTop: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: redesign.divider,
+  },
+  bankSelectText: {
+    flex: 1,
+    fontSize: 16,
+    color: redesign.textPrimary,
+  },
+  bankSelectPlaceholder: {
+    color: PLACEHOLDER_COLOR,
+  },
   lineInput: {
     fontSize: 16,
     color: redesign.textPrimary,
@@ -556,6 +746,11 @@ const styles = StyleSheet.create({
     color: redesign.textPrimary,
     paddingBottom: 14,
     marginLeft: 8,
+  },
+  amountError: {
+    marginTop: 8,
+    fontSize: 13,
+    color: colors.red,
   },
   quickRow: {
     flexDirection: 'row',

@@ -28,6 +28,7 @@ const { requestError, ASSET_REQUEST_ERROR } =
 
 const USER_A = { userId: '101', name: '김모아', phoneNumber: '+821011112222' };
 const USER_B = { userId: '102', name: '이모아', phoneNumber: '+821033334444' };
+const KAKAO = { bankCode: '001' };
 
 // ── 테스트 CI ─────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ test('테스트 CI: 사용자 id를 확인할 수 없으면 만들지 않는다(
 // ── 개설 입력 ─────────────────────────────────────────────────
 
 test('개설 입력: 로그인 사용자의 저장된 이름·전화번호와 고정 은행·상품, 사용자별 CI만으로 구성한다', () => {
-  const built = buildOpenAccountInput({ user: USER_A, initialBalance: 500000 });
+  const built = buildOpenAccountInput({ user: USER_A, initialBalance: 500000, bank: KAKAO });
   assert.deepEqual(built, {
     ok: true,
     input: {
@@ -61,13 +62,14 @@ test('개설 입력: 로그인 사용자의 저장된 이름·전화번호와 �
       userName: '김모아',
       phoneNumber: '+821011112222',
       bankCode: DEMO_BANK_CODE,
+      bankName: '카카오뱅크',
       productName: DEMO_PRODUCT_NAME,
       initialBalance: 500000,
     },
   });
   assert.equal(DEMO_BANK_CODE, '001');
   // 두 사용자의 입력은 CI·이름·전화번호가 서로 섞이지 않는다.
-  const b = buildOpenAccountInput({ user: USER_B, initialBalance: 0 });
+  const b = buildOpenAccountInput({ user: USER_B, initialBalance: 0, bank: KAKAO });
   assert.equal(b.input.ci, 'MOAJE-DEMO-102');
   assert.equal(b.input.userName, '이모아');
   assert.equal(b.input.phoneNumber, '+821033334444');
@@ -75,7 +77,7 @@ test('개설 입력: 로그인 사용자의 저장된 이름·전화번호와 �
 });
 
 test('개설 입력: 필수 정보가 없으면 만들지 않고 이유를 구분한다(값을 지어내지 않는다)', () => {
-  const reason = args => buildOpenAccountInput(args).reason;
+  const reason = args => buildOpenAccountInput(args && { bank: KAKAO, ...args }).reason;
   assert.equal(
     reason({ user: { ...USER_A, userId: null }, initialBalance: 0 }),
     OPEN_ACCOUNT_BLOCK_REASON.USER_ID
@@ -110,11 +112,49 @@ test('개설 입력: 필수 정보가 없으면 만들지 않고 이유를 구�
       String(bad)
     );
   }
-  assert.equal(buildOpenAccountInput({ user: USER_A, initialBalance: 0 }).ok, true);
+  assert.equal(buildOpenAccountInput({ user: USER_A, initialBalance: 0, bank: KAKAO }).ok, true);
   assert.equal(
-    buildOpenAccountInput({ user: USER_A, initialBalance: MAX_DEMO_INITIAL_BALANCE }).ok,
+    buildOpenAccountInput({
+      user: USER_A,
+      initialBalance: MAX_DEMO_INITIAL_BALANCE,
+      bank: KAKAO,
+    }).ok,
     true
   );
+});
+
+test('개설 입력: 은행을 선택하지 않았거나 목록에 없는 은행이면 개설 입력을 만들지 않는다(BANK)', () => {
+  for (const bank of [
+    undefined,
+    null,
+    {},
+    { bankCode: '' },
+    { bankCode: '011' },
+    { bankCode: 1 },
+    { bankCode: '1' },
+  ]) {
+    const built = buildOpenAccountInput({ user: USER_A, initialBalance: 0, bank });
+    assert.equal(built.ok, false, JSON.stringify(bank));
+    assert.equal(built.reason, OPEN_ACCOUNT_BLOCK_REASON.BANK);
+  }
+  // 이름·전화번호 같은 프로필 문제가 있으면 먼저 그 이유를 알린다.
+  assert.equal(
+    buildOpenAccountInput({ user: { ...USER_A, name: null }, initialBalance: 0, bank: null })
+      .reason,
+    OPEN_ACCOUNT_BLOCK_REASON.USER_NAME
+  );
+});
+
+test('개설 입력: 선택한 은행의 bankCode·bankName은 가상 은행 목록에서 가져오고 호출부가 보낸 bankName을 쓰지 않는다', () => {
+  const toss = buildOpenAccountInput({
+    user: USER_A,
+    initialBalance: 1000,
+    bank: { bankCode: '008', bankName: '엉뚱한이름' },
+  });
+  assert.equal(toss.ok, true);
+  assert.equal(toss.input.bankCode, '008');
+  assert.equal(toss.input.bankName, '토스뱅크');
+  assert.equal(typeof toss.input.bankCode, 'string');
 });
 
 // ── 송금 결과 분류 ────────────────────────────────────────────

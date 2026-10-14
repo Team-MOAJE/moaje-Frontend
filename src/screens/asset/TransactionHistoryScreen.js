@@ -436,6 +436,8 @@ export default function TransactionHistoryScreen({ navigation, route }) {
   const accountsError = useSelector(state => state.asset.accountsError);
   const selectedAccountId = useSelector(state => state.asset.selectedAccountId);
   const sessionGeneration = useSelector(state => state.asset.sessionGeneration);
+  // 송금 완료로 계좌 데이터가 무효화되면 같은 계좌여도 첫 페이지를 다시 조회한다.
+  const accountDataVersion = useSelector(state => state.asset.accountDataVersion);
 
   // 아래 state/ref는 모두 화면 제어용이다(서버 데이터를 복사하지 않는다).
   const [filter, setFilter] = useState('전체');
@@ -507,7 +509,7 @@ export default function TransactionHistoryScreen({ navigation, route }) {
       retryPendingRef.current = false;
       return;
     }
-    const requestKey = `${sessionGeneration}#${readyAccountId}#${refreshGeneration}`;
+    const requestKey = `${sessionGeneration}#${readyAccountId}#${refreshGeneration}#${accountDataVersion}`;
     if (lastRequestKeyRef.current === requestKey) return;
     lastRequestKeyRef.current = requestKey;
     retryPendingRef.current = false;
@@ -520,7 +522,14 @@ export default function TransactionHistoryScreen({ navigation, route }) {
     lastAccountIdRef.current = readyAccountId;
     setLastRequestKind('first');
     dispatch(fetchTransactions({ accountId: readyAccountId, queryKey }));
-  }, [dispatch, sessionGeneration, readyAccountId, routeSeedPending, refreshGeneration]);
+  }, [
+    dispatch,
+    sessionGeneration,
+    readyAccountId,
+    routeSeedPending,
+    refreshGeneration,
+    accountDataVersion,
+  ]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {

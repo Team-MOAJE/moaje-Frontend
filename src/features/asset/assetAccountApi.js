@@ -1,5 +1,5 @@
 // Asset 계좌 API 통신 레이어 (API-11 계좌 상세+거래, API-12 거래 단건, API-13 거래 목록, API-14 계좌 Refresh).
-// 기준: docs/moaje-frontend-api-guide-20261011.pdf, 백엔드 moaje-asset 소스(AccountController, AccountDetailModels 읽기 확인).
+// 기준: docs/moaje-frontend-api-guide-20261011(최신화).pdf(20261014 반영), 백엔드 moaje-asset 소스(AccountController, AccountDetailModels 읽기 확인).
 //
 // 이 모듈은 HTTP 호출·응답 검증/변환만 담당한다. 화면/Redux를 알지 못한다.
 //
@@ -25,6 +25,7 @@ import {
   isBoolean,
   isDateTimeString,
   isFiniteNumber,
+  isAccountNumber,
   isNonEmptyString,
   isString,
   isValidLongId,
@@ -179,29 +180,29 @@ const mapMoney = (item, key, field, { allowNegative = true } = {}) => {
 
 const mapBalance = (item, field) => mapMoney(item, 'balance', field);
 
-// API-52 계좌 1건. 은행명·계좌번호 필드는 서버가 주지 않으므로 만들지 않는다.
+// API-52 계좌 1건(최신 명세 20261014): { accountId, bankCode, bankName, balance, status }.
+// syncStatus·lastSyncedAt·createdAt은 목록 응답에서 제거됐으므로 읽지도, 만들지도 않는다(없는 값은 호출부에서 null).
 const mapAccountListItem = (item, field) => {
   requireObject(item, field);
 
   return {
     accountId: requireId(item, 'accountId', field),
+    bankCode: optionalField(item, 'bankCode', isString, field),
+    bankName: optionalField(item, 'bankName', isString, field),
+    // 서버가 마스킹한 표시용 번호(예: **********1234). 전체 번호는 목록에 오지 않으며 앱도 마스킹을 만들지 않는다.
+    maskedAccountNumber: optionalField(item, 'maskedAccountNumber', isString, field),
     ...mapBalance(item, field),
     status: requireField(item, 'status', oneOf(ACCOUNT_STATUSES), field),
-    syncStatus: requireField(item, 'syncStatus', oneOf(ACCOUNT_SYNC_STATUSES), field),
-    lastSyncedAt: optionalField(item, 'lastSyncedAt', isDateTimeString, field),
-    createdAt: requireField(item, 'createdAt', isDateTimeString, field),
   };
 };
 
-// API-52 응답. accounts 빈 배열은 정상이다. 서버 순서(accountId 오름차순)를 유지한다.
+// API-52 응답. 최신 명세는 루트 배열이다(구 소스의 { accounts: [...] } 객체형은 계약이 아니므로 거부한다).
+// 빈 배열은 정상이다. 서버 순서를 유지하고, 호출부 호환을 위해 { accounts }로 감싸 돌려준다.
 export const mapAccountListResponse = body => {
   const field = 'accountList';
-  requireObject(body, field);
-  const accounts = requireField(body, 'accounts', Array.isArray, field);
+  if (!Array.isArray(body)) throw invalidResponse(field);
   return {
-    accounts: accounts.map((item, index) =>
-      mapAccountListItem(item, `${field}.accounts[${index}]`)
-    ),
+    accounts: body.map((item, index) => mapAccountListItem(item, `${field}[${index}]`)),
   };
 };
 
@@ -213,8 +214,9 @@ export const mapAccountDetailResponse = (body, field = 'accountDetail') => {
     accountId: requireId(body, 'accountId', field),
     bankCode: optionalField(body, 'bankCode', isString, field),
     bankName: optionalField(body, 'bankName', isString, field),
-    displayAccountNumber: requireField(body, 'displayAccountNumber', isNonEmptyString, field),
-    maskedAccountNumber: requireField(body, 'maskedAccountNumber', isNonEmptyString, field),
+    // 실제 계좌번호(서버가 14자리 숫자 문자열로 보장). 없으면 null이며 다른 필드로 대신 만들지 않는다.
+    // 구버전 displayAccountNumber/maskedAccountNumber는 최신 서버에서 제거되어 읽지 않는다.
+    accountNumber: optionalField(body, 'accountNumber', isAccountNumber, field),
     ...mapBalance(body, field),
     syncStatus: requireField(body, 'syncStatus', oneOf(ACCOUNT_SYNC_STATUSES), field),
     refreshing: requireField(body, 'refreshing', isBoolean, field),
