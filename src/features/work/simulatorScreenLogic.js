@@ -30,16 +30,16 @@ const invalidData = field => {
 
 // 표시 순서 고정. key는 simulatorApi가 받는 camelCase 입력 키와 같다.
 export const SIMULATOR_FIELDS = Object.freeze([
-  { key: 'monthlyIncome', label: '세후 월수입', hint: '비워두면 서버 기준값으로 계산해요' },
-  { key: 'monthlyHousing', label: '월 주거비', hint: '비워두면 서버 기준값으로 계산해요' },
-  { key: 'monthlyLiving', label: '월 기본 생활비', hint: '비워두면 서버 기준값으로 계산해요' },
-  { key: 'monthlyLeisure', label: '월 여가비', hint: '비워두면 서버 기준값으로 계산해요' },
-  { key: 'deposit', label: '보증금', hint: '비워두면 서버 기준값으로 계산해요' },
-  { key: 'moveInCost', label: '초기 정착 비용', hint: '비워두면 서버 기준값으로 계산해요' },
+  { key: 'monthlyIncome', label: '세후 월수입', hint: '입력하지 않으면 기본값으로 계산해요.' },
+  { key: 'monthlyHousing', label: '월 주거비', hint: '입력하지 않으면 기본값으로 계산해요.' },
+  { key: 'monthlyLiving', label: '월 기본 생활비', hint: '입력하지 않으면 기본값으로 계산해요.' },
+  { key: 'monthlyLeisure', label: '월 여가비', hint: '입력하지 않으면 기본값으로 계산해요.' },
+  { key: 'deposit', label: '보증금', hint: '입력하지 않으면 기본값으로 계산해요.' },
+  { key: 'moveInCost', label: '초기 정착 비용', hint: '입력하지 않으면 기본값으로 계산해요.' },
   {
     key: 'currentAsset',
     label: '현재 자산',
-    hint: '비워두면 연결된 계좌 기준으로 서버가 계산해요',
+    hint: '입력하지 않으면 연결된 계좌 정보를 확인해 계산해요.',
   },
 ]);
 

@@ -23,7 +23,7 @@ export default function SimulatorInputForm({
               value={form[field.key]}
               onChangeText={text => onChangeField(field.key, text)}
               keyboardType="number-pad"
-              placeholder="비워두면 서버 기준값"
+              placeholder="입력하지 않으면 기본값"
               placeholderTextColor={redesign.navInactive}
               accessibilityLabel={field.label}
               style={[styles.input, errorCode && styles.inputError]}

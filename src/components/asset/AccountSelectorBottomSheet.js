@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { redesign } from '../../theme/redesign';
+import {
+  getAccountStatusLabel,
+  getAccountStatusNotice,
+} from '../../features/asset/assetScreenLogic';
+
+// 조회용 계좌 선택 시트다. ACTIVE/SUSPENDED/CLOSED 모두 고를 수 있고, 송금 출금 계좌 후보와는 무관하다
+// (송금 가능 여부는 canTransferFrom, 출금 계좌 결정은 TransferScreen이 따로 한다).
+// 서버에 은행명·실제 계좌번호가 없으므로 정적 계좌 라벨만 표시한다.
 
 export default function AccountSelectorBottomSheet({
   visible,
@@ -60,10 +68,16 @@ export default function AccountSelectorBottomSheet({
               style={styles.accountRow}
             >
               <View style={styles.accountInfo}>
-                <Text style={styles.bankName}>{account.bankName ?? '-'}</Text>
-                <Text style={styles.accountName}>{account.accountLabel ?? account.bankName}</Text>
-                {account.maskedAccountNumber ? (
-                  <Text style={styles.maskedNumber}>{account.maskedAccountNumber}</Text>
+                <View style={styles.nameRow}>
+                  <Text style={styles.accountName}>{account.label ?? '내 계좌'}</Text>
+                  {getAccountStatusLabel(account) ? (
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusBadgeText}>{getAccountStatusLabel(account)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {getAccountStatusNotice(account) ? (
+                  <Text style={styles.statusNotice}>{getAccountStatusNotice(account)}</Text>
                 ) : null}
               </View>
               {selected ? <Feather name="check" size={20} color={redesign.accent} /> : null}
@@ -131,7 +145,22 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  bankName: {
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: redesign.divider,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    color: redesign.textSecondary,
+  },
+  statusNotice: {
     fontSize: 12,
     color: redesign.textSecondary,
   },
@@ -139,10 +168,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: redesign.textPrimary,
-  },
-  maskedNumber: {
-    fontSize: 12,
-    color: redesign.textSecondary,
-    fontFamily: 'monospace',
   },
 });

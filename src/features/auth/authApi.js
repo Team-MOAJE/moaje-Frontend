@@ -12,6 +12,7 @@ import {
   unlockWithPin,
 } from '../../services/tokenService';
 import { markLogoutPending, isLogoutPending, clearLogoutPending } from './authStorage';
+import { removeDailyLimitRecordSafely } from '../asset/dailyLimitStorage';
 import { API_ENDPOINTS } from '../../constants/apiEndpoints';
 import { normalizeApiError } from '../../utils/normalizeApiError';
 import { API_ERROR_KIND, createApiError } from '../../services/apiResponse';
@@ -339,6 +340,147 @@ export const fetchCurrentUser = createAsyncThunk(
       return rejectMeFailure(error, rejectWithValue, epoch0);
     }
   }
+);
+
+// ── 내 정보 수정(API-48)·회원 탈퇴(API-49)·PIN 변경(API-51) ─────────────────
+// 모두 JWT가 필요한 Auth envelope API다. PIN 재설정(PIN_RESET_ENDPOINTS, 현재 PIN을 모르는 경우)과는 다른 기능이다.
+const PIN_PATTERN = /^[0-9]{6}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// 입력 검증 실패. 서버 요청 없이 화면 메시지로만 쓴다(kind 없음 → normalizeApiError가 message를 그대로 사용).
+const validationError = message => new Error(message);
+
+const requirePin = (pin, label) => {
+  if (typeof pin !== 'string' || !PIN_PATTERN.test(pin)) {
+    throw validationError(`${label}는 숫자 6자리여야 합니다.`);
+  }
+  return pin;
+};
+
+// API-48 요청 본문. 명세: email 생략=유지, null=삭제 / name은 null이면 현재 값 유지, 공백만 입력 불가.
+// 입력: { name?: string, email?: string | null }. undefined와 name:null은 보내지 않고, email의 null·빈 문자열은 삭제(null)로 보낸다.
+export function buildProfileUpdateRequest({ name, email } = {}) {
+  const body = {};
+
+  if (name !== undefined && name !== null) {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (trimmed === '') throw validationError('이름을 입력해 주세요.');
+    body.name = trimmed;
+  }
+
+  if (email !== undefined) {
+    const trimmed = typeof email === 'string' ? email.trim() : '';
+    if (email === null || trimmed === '') {
+      body.email = null;
+    } else if (!EMAIL_PATTERN.test(trimmed)) {
+      throw validationError('이메일 형식이 올바르지 않습니다.');
+    } else {
+      body.email = trimmed;
+    }
+  }
+
+  if (!('name' in body) && !('email' in body)) {
+    throw validationError('수정할 항목이 없습니다.');
+  }
+  return body;
+}
+
+// 같은 계정 요청(수정·탈퇴·PIN 변경)이 동시에 진행되지 않게 한다.
+const noConcurrentAccountAction = (_, { getState }) => !getState().auth?.isAccountActionPending;
+
+// 서버가 세션을 끝낸 뒤(탈퇴·PIN 변경 성공) 로컬 인증 정보를 정리한다. 서버 로그아웃(API-08)은 다시 호출하지 않는다.
+// 이 요청 이후 다른 세션이 시작됐으면(stale) 새 세션을 건드리지 않고 sessionEnded:false를 돌려준다.
+const endLocalSession = async startEpoch => {
+  const cleared = await clearTokensIfEpoch(startEpoch).catch(() => null);
+  return { sessionEnded: cleared !== null && cleared.status !== 'stale' };
+};
+
+// 입력: { name?, email? } (buildProfileUpdateRequest 참고). 서버가 성공 envelope을 준 경우에만 fulfilled.
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (input, { rejectWithValue, getState }) => {
+    const startEpoch = getSessionEpoch();
+
+    try {
+      const body = buildProfileUpdateRequest(input);
+      const data = await apiClient.patch(API_ENDPOINTS.AUTH.ME, body);
+
+      if (!isNonEmptyString(data?.user_id)) {
+        throw new Error('내 정보 수정 응답을 해석할 수 없습니다.');
+      }
+      const currentUserId = getState().auth?.user?.userId;
+      if (getSessionEpoch() !== startEpoch || (currentUserId && currentUserId !== data.user_id)) {
+        return rejectWithValue(canceledRejection('profile', '내 정보를 수정하지 못했습니다.'));
+      }
+      return { user: mapAuthUser(data) };
+    } catch (error) {
+      return rejectWithValue({
+        ...normalizeApiError(error, '내 정보를 수정하지 못했습니다.'),
+        stage: 'profile',
+      });
+    }
+  },
+  { condition: noConcurrentAccountAction }
+);
+
+// 회원 탈퇴(API-49). 입력: { currentPin }. 서버 성공이 확인된 뒤에만 로컬 토큰을 정리한다(실패하면 로그인 상태 유지).
+// RE_LOGIN 응답이어도 토큰을 지우지 않는다(skipSessionHandling) — PIN 오입력이 세션 종료로 번지지 않게 한다.
+export const deleteAccount = createAsyncThunk(
+  'auth/deleteAccount',
+  async ({ currentPin } = {}, { rejectWithValue, getState }) => {
+    const startEpoch = getSessionEpoch();
+    const userId = getState().auth?.user?.userId;
+
+    try {
+      requirePin(currentPin, '현재 PIN');
+      await apiClient.delete(API_ENDPOINTS.AUTH.ME, {
+        data: { current_pin: currentPin },
+        skipSessionHandling: true,
+      });
+    } catch (error) {
+      return rejectWithValue({
+        ...normalizeApiError(error, '회원 탈퇴에 실패했습니다.'),
+        stage: 'deleteAccount',
+      });
+    }
+
+    // 서버 탈퇴가 성공한 뒤에만 이 사용자의 로컬 API-15 기록을 지운다. 삭제가 실패해도(예외 없음, 진단 로그만)
+    // 토큰 정리와 로그아웃 전환은 계속 진행한다.
+    await removeDailyLimitRecordSafely(userId);
+
+    return endLocalSession(startEpoch);
+  },
+  { condition: noConcurrentAccountAction }
+);
+
+// PIN 변경(API-51). 입력: { currentPin, newPin, newPinConfirm }. 성공하면 서버가 Refresh Token을 폐기하므로
+// 로컬 인증 정보를 정리하고 새 PIN으로 다시 로그인하게 한다. 실패하면 로그인 상태를 유지한다.
+export const changePin = createAsyncThunk(
+  'auth/changePin',
+  async ({ currentPin, newPin, newPinConfirm } = {}, { rejectWithValue }) => {
+    const startEpoch = getSessionEpoch();
+
+    try {
+      requirePin(currentPin, '현재 PIN');
+      requirePin(newPin, '새 PIN');
+      requirePin(newPinConfirm, '새 PIN 확인');
+      if (newPin !== newPinConfirm) throw validationError('새 PIN이 일치하지 않습니다.');
+
+      await apiClient.post(
+        API_ENDPOINTS.AUTH.PIN_CHANGE,
+        { current_pin: currentPin, new_pin: newPin, new_pin_confirm: newPinConfirm },
+        { skipSessionHandling: true }
+      );
+    } catch (error) {
+      return rejectWithValue({
+        ...normalizeApiError(error, 'PIN 변경에 실패했습니다.'),
+        stage: 'changePin',
+      });
+    }
+
+    return endLocalSession(startEpoch);
+  },
+  { condition: noConcurrentAccountAction }
 );
 
 // PIN 재설정 전 회원정보(전화번호 + 이름) 확인. 실제 본인인증이 아니다.

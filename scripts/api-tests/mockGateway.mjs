@@ -73,6 +73,9 @@ export class MockGateway {
       path,
       headers: { ...req.headers },
       body: rawText ? JSON.parse(rawText) : undefined,
+      // 전송된 원문(큰 정수 리터럴 보존 검증용)과 쿼리 문자열. 기존 필드는 그대로다.
+      rawBody: rawText || undefined,
+      query: req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '',
     };
     this.requests.push(record);
 

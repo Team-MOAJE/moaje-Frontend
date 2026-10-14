@@ -10,19 +10,29 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, useStore } from 'react-redux';
 import { colors } from '../../theme';
 import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
+import { fetchAccounts, fetchTransactions } from '../../features/asset/assetApi';
 import {
-  fetchAccounts,
-  fetchTransactions,
-  fetchAccountSummary,
-} from '../../features/asset/assetApi';
-import { resetTransactions, beginTransactionsRefresh } from '../../features/asset/assetSlice';
+  resetTransactions,
+  beginTransactionsRefresh,
+  setSelectedAccountId,
+} from '../../features/asset/assetSlice';
+import {
+  buildHistoryViewModel,
+  formatExactMoney,
+  formatServerDateTime,
+  formatTxAmount,
+  getAccountStatusLabel,
+  getAccountStatusNotice,
+  getTxTypeLabel,
+  resolveHistoryTarget,
+  resolveTxTitle,
+  txAmountTone,
+} from '../../features/asset/assetScreenLogic';
 import { mapTransactionStatus } from '../../utils/mapTransactionStatus';
-import { selectDefaultAccount } from '../../utils/selectDefaultAccount';
-import { formatDateTime } from '../../utils/formatDate';
 import TransactionPeriodModal, {
   computePeriodRange,
   getPeriodLabel,
@@ -31,47 +41,23 @@ import TransactionStatusBadge from '../../components/asset/TransactionStatusBadg
 
 const FILTERS = ['전체', '입금', '출금', '송금'];
 
-const getGroup = isoString => {
-  if (!isoString) return '이전';
-  const d = new Date(isoString);
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / 86400000);
-  if (diffDays === 0) return '오늘';
-  if (diffDays === 1) return '어제';
-  if (diffDays < 7) return '이번 주';
-  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
-};
-
-const matchesFilter = (tx, f) => {
-  switch (f) {
-    case '전체':
-      return true;
-    case '입금':
-      return tx.status === 'depositCompleted';
-    case '출금':
-      return tx.status === 'expenseCompleted';
-    case '송금':
-      return tx.status === 'completed' || tx.status === 'pending';
-    default:
-      return true;
-  }
-};
+// 정상 완료 상태는 badge 없이 보조 정보(거래 유형)만 노출한다. 그 외(pending/checking/failed/canceled)는 badge로 보여준다.
+const NORMAL_STATUSES = ['completed', 'depositCompleted', 'expenseCompleted'];
 
 // ── 서브 컴포넌트 ─────────────────────────────────────────────
 
-function TransactionSummary({ bank, token, current, available }) {
+// 서버 계좌 목록의 라벨과 정확성이 보장된 잔액만 보여준다(요약·사용 가능 금액 API는 없다).
+function TransactionSummary({ label, statusLabel, statusNotice, balanceText }) {
   return (
     <View style={summaryStyles.container}>
-      <Text style={summaryStyles.bankName}>{bank}</Text>
-      <Text style={summaryStyles.token}>{token}</Text>
+      <View style={summaryStyles.titleRow}>
+        <Text style={summaryStyles.title}>{label}</Text>
+        {statusLabel ? <Text style={summaryStyles.statusBadge}>{statusLabel}</Text> : null}
+      </View>
+      {statusNotice ? <Text style={summaryStyles.notice}>{statusNotice}</Text> : null}
 
       <Text style={summaryStyles.currentLabel}>현재 잔액</Text>
-      <Text style={summaryStyles.currentBalance}>{current.toLocaleString()}원</Text>
-
-      <View style={summaryStyles.availableRow}>
-        <Text style={summaryStyles.availableLabel}>사용 가능 금액</Text>
-        <Text style={summaryStyles.availableVal}>{available.toLocaleString()}원</Text>
-      </View>
+      <Text style={summaryStyles.currentBalance}>{balanceText}</Text>
     </View>
   );
 }
@@ -80,15 +66,25 @@ const summaryStyles = StyleSheet.create({
   container: {
     marginTop: 8,
   },
-  bankName: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
     fontSize: 15,
     fontWeight: '600',
     color: redesign.textPrimary,
   },
-  token: {
+  statusBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: redesign.textSecondary,
+  },
+  notice: {
     fontSize: 12,
     color: redesign.textSecondary,
-    marginTop: 2,
+    marginTop: 4,
   },
   currentLabel: {
     fontSize: 12,
@@ -102,24 +98,6 @@ const summaryStyles = StyleSheet.create({
     letterSpacing: -0.6,
     color: redesign.textPrimary,
     marginTop: 2,
-  },
-  availableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: redesign.divider,
-  },
-  availableLabel: {
-    fontSize: 13,
-    color: redesign.textSecondary,
-  },
-  availableVal: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: redesign.textPrimary,
   },
 });
 
@@ -157,41 +135,27 @@ const filterStyles = StyleSheet.create({
   },
 });
 
-// 정상 완료 상태는 사용자에게 badge로 노출하지 않고 보조 정보에 거래 종류만 표시한다.
-// 그 외 상태(pending/failed 등 향후 예외 상태)는 의미가 있으므로 기존 badge로 계속 보여준다.
-const NORMAL_STATUS_KIND = {
-  completed: '송금',
-  depositCompleted: '입금',
-  expenseCompleted: '출금',
-};
-
 function TransactionHistoryRow({ tx, onPress }) {
-  const positive = tx.amount > 0;
-  const kind = NORMAL_STATUS_KIND[tx.status];
-  const isNormalStatus = kind !== undefined;
+  const status = mapTransactionStatus(tx.status, tx.type);
+  const amountColor = txAmountTone(tx) === 'positive' ? colors.green : redesign.textPrimary;
   return (
     <Pressable
       onPress={onPress}
-      disabled={!onPress}
       style={({ pressed }) => [rowStyles.container, pressed && rowStyles.pressed]}
       accessibilityRole="button"
     >
       <View style={rowStyles.left}>
         <Text style={rowStyles.counterparty} numberOfLines={1}>
-          {tx.counterparty}
+          {resolveTxTitle(tx)}
         </Text>
         <Text style={rowStyles.meta} numberOfLines={1}>
-          {kind ? `${kind} · ` : ''}
-          {tx.time}
+          {`${getTxTypeLabel(tx)} · ${formatServerDateTime(tx.createdAt)}`}
         </Text>
       </View>
 
       <View style={rowStyles.right}>
-        <Text style={[rowStyles.amount, { color: positive ? colors.green : redesign.textPrimary }]}>
-          {positive ? '+' : ''}
-          {tx.amount.toLocaleString()}원
-        </Text>
-        {!isNormalStatus && <TransactionStatusBadge status={tx.status} />}
+        <Text style={[rowStyles.amount, { color: amountColor }]}>{formatTxAmount(tx)}</Text>
+        {!NORMAL_STATUSES.includes(status) && <TransactionStatusBadge status={status} />}
       </View>
     </Pressable>
   );
@@ -295,13 +259,12 @@ const skeletonStyles = StyleSheet.create({
   },
 });
 
+// 서버 API 없이 동작하지 않는 "계좌 연결" 버튼은 두지 않는다. 송금하기만 제공한다.
 function TransactionEmptyState({ onTransfer }) {
   return (
     <View style={emptyStyles.container}>
       <Text style={emptyStyles.title}>아직 거래내역이 없어요.</Text>
-      <Text style={emptyStyles.desc}>
-        {'송금하거나 계좌를 연결하면\n자산 흐름이 여기에 표시돼요.'}
-      </Text>
+      <Text style={emptyStyles.desc}>송금하면 자산 흐름이 여기에 표시돼요.</Text>
 
       <View style={emptyStyles.actions}>
         <Pressable
@@ -309,16 +272,6 @@ function TransactionEmptyState({ onTransfer }) {
           style={({ pressed }) => [emptyStyles.primaryBtn, pressed && { opacity: 0.85 }]}
         >
           <Text style={emptyStyles.primaryBtnText}>송금하기</Text>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [
-            emptyStyles.secondaryBtn,
-            pressed && emptyStyles.secondaryPressed,
-          ]}
-        >
-          <Text style={emptyStyles.secondaryBtnText}>계좌 연결</Text>
-          <Feather name="lock" size={12} color={redesign.navInactive} />
         </Pressable>
       </View>
     </View>
@@ -357,25 +310,51 @@ const emptyStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  secondaryBtn: {
-    height: 52,
-    borderRadius: 12,
-    flexDirection: 'row',
-    gap: 6,
+});
+
+function InlineButton({ label, onPress, disabled }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [
+        inlineStyles.btn,
+        disabled && inlineStyles.disabled,
+        pressed && inlineStyles.pressed,
+      ]}
+    >
+      <Text style={inlineStyles.text}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const inlineStyles = StyleSheet.create({
+  btn: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    height: 40,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    backgroundColor: redesign.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryPressed: {
-    backgroundColor: redesign.surfaceSoft,
+  text: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: redesign.textSecondary,
+  pressed: {
+    opacity: 0.7,
+  },
+  disabled: {
+    opacity: 0.4,
   },
 });
 
-function TransactionLoadMoreFooter({ isLoadingMore }) {
+function TransactionLoadMoreFooter({ isLoadingMore, errorMessage, onRetry }) {
   return (
     <View>
       {isLoadingMore && (
@@ -383,6 +362,12 @@ function TransactionLoadMoreFooter({ isLoadingMore }) {
           <ActivityIndicator size="small" color={redesign.accent} />
         </View>
       )}
+      {errorMessage ? (
+        <View style={footerStyles.errorBox}>
+          <Text style={footerStyles.errorText}>다음 거래를 불러오지 못했어요.</Text>
+          <InlineButton label="다시 시도" onPress={onRetry} disabled={isLoadingMore} />
+        </View>
+      ) : null}
       <View style={footerStyles.spacer} />
     </View>
   );
@@ -393,24 +378,41 @@ const footerStyles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  errorBox: {
+    paddingVertical: 16,
+  },
+  errorText: {
+    fontSize: 14,
+    color: redesign.textSecondary,
+  },
   spacer: {
     height: 40,
   },
 });
 
-function TransactionErrorState({ message }) {
+function StatusMessage({ title, message, actionLabel, onAction, actionDisabled }) {
   return (
-    <View style={errorStyles.container}>
-      <Text style={errorStyles.text}>{message}</Text>
+    <View style={statusStyles.container}>
+      <Text style={statusStyles.title}>{title}</Text>
+      {message ? <Text style={statusStyles.text}>{message}</Text> : null}
+      {actionLabel ? (
+        <InlineButton label={actionLabel} onPress={onAction} disabled={actionDisabled} />
+      ) : null}
     </View>
   );
 }
 
-const errorStyles = StyleSheet.create({
+const statusStyles = StyleSheet.create({
   container: {
     paddingTop: 48,
   },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: redesign.textPrimary,
+  },
   text: {
+    marginTop: 6,
     fontSize: 14,
     color: redesign.textSecondary,
     lineHeight: 21,
@@ -419,53 +421,106 @@ const errorStyles = StyleSheet.create({
 
 // ── 메인 화면 ─────────────────────────────────────────────────
 
-export default function TransactionHistoryScreen({ navigation }) {
+export default function TransactionHistoryScreen({ navigation, route }) {
   const dispatch = useDispatch();
+  const store = useStore();
   const transactions = useSelector(state => state.asset.transactions);
-  const summary = useSelector(state => state.asset.summary);
+  const transactionsAccountId = useSelector(state => state.asset.transactionsAccountId);
   const transactionsLoading = useSelector(state => state.asset.transactionsLoading);
   const transactionsLoadingMore = useSelector(state => state.asset.transactionsLoadingMore);
-  const transactionsHasMore = useSelector(state => state.asset.transactionsHasMore);
-  const transactionsNextPage = useSelector(state => state.asset.transactionsNextPage);
+  const transactionsHasNext = useSelector(state => state.asset.transactionsHasNext);
+  const transactionsNextCursor = useSelector(state => state.asset.transactionsNextCursor);
   const transactionsError = useSelector(state => state.asset.transactionsError);
   const accounts = useSelector(state => state.asset.accounts);
-  const defaultAccount = selectDefaultAccount(accounts);
+  const accountsLoading = useSelector(state => state.asset.accountsLoading);
+  const accountsError = useSelector(state => state.asset.accountsError);
+  const selectedAccountId = useSelector(state => state.asset.selectedAccountId);
+  const sessionGeneration = useSelector(state => state.asset.sessionGeneration);
 
+  // 아래 state/ref는 모두 화면 제어용이다(서버 데이터를 복사하지 않는다).
   const [filter, setFilter] = useState('전체');
   const [periodType, setPeriodType] = useState('전체');
   const [customStartKey, setCustomStartKey] = useState(null);
   const [customEndKey, setCustomEndKey] = useState(null);
   const [periodModalVisible, setPeriodModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [accountsRequested, setAccountsRequested] = useState(false);
+  const [refreshGeneration, setRefreshGeneration] = useState(0);
+  const [lastRequestKind, setLastRequestKind] = useState(null); // 'first' | 'more' — 마지막으로 보낸 거래 요청 종류
+
+  const mountedRef = useRef(false);
+  const isRefreshingRef = useRef(false);
+  const retryPendingRef = useRef(false);
+  const lastRequestKeyRef = useRef(null); // 마지막으로 첫 페이지를 요청한 키(문자열)
+  const lastAccountIdRef = useRef(null); // 마지막으로 첫 페이지를 요청한 계좌 id(문자열)
 
   const dateRange = useMemo(
     () => computePeriodRange(periodType, customStartKey, customEndKey),
     [periodType, customStartKey, customEndKey]
   );
 
-  // dateRange는 매 렌더마다 새 객체이므로 effect deps로 쓰면 안 된다.
-  // 대신 startKey/endKey로 만든 primitive 문자열을 식별자 겸 effect dep으로 쓴다.
-  const transactionQueryKey = useMemo(
-    () => `${dateRange.startKey ?? 'all'}:${dateRange.endKey ?? 'all'}`,
-    [dateRange.startKey, dateRange.endKey]
-  );
+  // ── 조회 대상 계좌 ──
+  const routeAccountId =
+    typeof route?.params?.accountId === 'string' && route.params.accountId !== ''
+      ? route.params.accountId
+      : null;
+  const routeAccountListed =
+    routeAccountId !== null && accounts.some(account => account.id === routeAccountId);
+  // route로 받은 계좌가 목록에 없으면 임의의 다른 계좌로 대체하지 않는다.
+  const routeAccountMissing = routeAccountId !== null && accounts.length > 0 && !routeAccountListed;
+  // route 계좌가 목록에 있지만 선택 상태와 다르면 선택을 맞출 때까지 거래 요청을 보류한다.
+  const routeSeedPending = routeAccountListed && routeAccountId !== selectedAccountId;
 
-  // "어떤 쿼리의 몇 번째 페이지 요청인지"를 식별하는 토큰을 저장한다.
-  // 기간이 바뀐 뒤 뒤늦게 끝나는 이전 기간 loadMore의 .finally()가 새 기간의
-  // guard를 잘못 풀어버리지 않도록, 저장 당시 토큰과 현재 값이 같을 때만 해제한다.
-  const loadMoreTokenRef = useRef(null);
+  const target = resolveHistoryTarget({
+    accounts,
+    selectedAccountId,
+    accountsLoading,
+    accountsError,
+    fetched: accountsRequested,
+  });
+  const readyAccountId =
+    target.kind === 'ready' && !routeSeedPending && !routeAccountMissing ? target.accountId : null;
+  const readyAccount = readyAccountId !== null ? target.account : null;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     dispatch(fetchAccounts());
-    dispatch(fetchAccountSummary());
+    setAccountsRequested(true);
   }, [dispatch]);
 
   useEffect(() => {
-    loadMoreTokenRef.current = null; // 이전 기간의 in-flight loadMore guard를 강제 해제
-    dispatch(resetTransactions({ queryKey: transactionQueryKey }));
-    dispatch(fetchTransactions({ page: 0, dateRange, queryKey: transactionQueryKey }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactionQueryKey, dispatch]);
+    if (routeSeedPending) dispatch(setSelectedAccountId(routeAccountId));
+  }, [dispatch, routeSeedPending, routeAccountId]);
+
+  // 거래 첫 페이지 요청은 이 effect 한 곳에서만 보낸다(새로고침·다시 시도는 refreshGeneration만 올린다).
+  // 같은 요청 키(세션·계좌·세대)는 dispatch 전에 동기 기록해 중복 네트워크 요청 자체를 막는다.
+  useEffect(() => {
+    if (readyAccountId === null || routeSeedPending) {
+      lastRequestKeyRef.current = null;
+      lastAccountIdRef.current = null;
+      retryPendingRef.current = false;
+      return;
+    }
+    const requestKey = `${sessionGeneration}#${readyAccountId}#${refreshGeneration}`;
+    if (lastRequestKeyRef.current === requestKey) return;
+    lastRequestKeyRef.current = requestKey;
+    retryPendingRef.current = false;
+    const queryKey = `account:${readyAccountId}`;
+    if (lastAccountIdRef.current === readyAccountId) {
+      dispatch(beginTransactionsRefresh());
+    } else {
+      dispatch(resetTransactions({ queryKey }));
+    }
+    lastAccountIdRef.current = readyAccountId;
+    setLastRequestKind('first');
+    dispatch(fetchTransactions({ accountId: readyAccountId, queryKey }));
+  }, [dispatch, sessionGeneration, readyAccountId, routeSeedPending, refreshGeneration]);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -475,44 +530,66 @@ export default function TransactionHistoryScreen({ navigation }) {
     }
   };
 
+  // 새로고침: 계좌 목록을 먼저 확인한 뒤(직렬) 같은 계좌가 유효할 때만 첫 페이지 세대를 올린다.
+  // 거래 요청은 위 effect가 최신 목록 기준으로 한 번만 보낸다.
   const handleRefresh = async () => {
-    if (isRefreshing) return;
+    if (isRefreshingRef.current || accountsLoading || transactionsLoading) return;
+    isRefreshingRef.current = true;
     setIsRefreshing(true);
-    // beginTransactionsRefresh()로 seq만 새로 시작 — 새로고침 직전까지 진행 중이던
-    // loadMore가 있었다면 다른 seq를 갖게 되어 나중에 응답이 와도 stale로 무시된다.
-    dispatch(beginTransactionsRefresh());
-    loadMoreTokenRef.current = null;
+    const startedAccountId = readyAccountId;
     try {
-      await Promise.all([
-        dispatch(fetchAccounts()),
-        dispatch(fetchTransactions({ page: 0, dateRange, queryKey: transactionQueryKey })),
-        dispatch(fetchAccountSummary()),
-      ]);
+      const result = await dispatch(fetchAccounts());
+      if (!fetchAccounts.fulfilled.match(result) || !mountedRef.current) return;
+      if (startedAccountId === null) return; // 조회 가능 상태가 되면 effect가 첫 요청을 보낸다
+      const fresh = store.getState().asset;
+      const stillValid =
+        fresh.selectedAccountId === startedAccountId &&
+        fresh.accounts.some(account => account.id === startedAccountId);
+      if (stillValid) setRefreshGeneration(generation => generation + 1);
     } finally {
-      setIsRefreshing(false);
+      isRefreshingRef.current = false;
+      if (mountedRef.current) setIsRefreshing(false);
     }
   };
 
-  const handleLoadMore = () => {
-    if (transactionsLoading || transactionsLoadingMore || !transactionsHasMore) return;
-    if (loadMoreTokenRef.current) return; // 이미 in-flight 요청 있음
-    const token = `${transactionQueryKey}:${transactionsNextPage}`;
-    loadMoreTokenRef.current = token;
+  // 첫 페이지 다시 시도: 거래를 직접 요청하지 않고 세대만 올려 effect가 한 번만 요청하게 한다.
+  const handleFirstPageRetry = () => {
+    if (readyAccountId === null || retryPendingRef.current || transactionsLoading) return;
+    retryPendingRef.current = true;
+    setRefreshGeneration(generation => generation + 1);
+  };
+
+  // 다음 페이지(커서). 실패해도 transactionsNextCursor는 그대로라 같은 커서로 다시 요청한다.
+  const requestNextPage = () => {
+    if (readyAccountId === null || transactionsAccountId !== readyAccountId) return;
+    if (!transactionsHasNext || transactionsLoading || transactionsLoadingMore) return;
+    setLastRequestKind('more');
     dispatch(
-      fetchTransactions({ page: transactionsNextPage, dateRange, queryKey: transactionQueryKey })
-    ).finally(() => {
-      if (loadMoreTokenRef.current === token) {
-        loadMoreTokenRef.current = null;
-      }
-    });
+      fetchTransactions({
+        accountId: readyAccountId,
+        cursor: transactionsNextCursor,
+        queryKey: `account:${readyAccountId}`,
+      })
+    );
+  };
+  const handleEndReached = () => {
+    if (transactionsError) return; // 오류 뒤에는 자동으로 다시 요청하지 않는다
+    requestNextPage();
+  };
+  const handleNextPageRetry = requestNextPage;
+
+  const handleAccountsRetry = () => {
+    if (!accountsLoading) dispatch(fetchAccounts());
   };
 
   const handleTransferPress = () => navigation.navigate(ROUTES.TRANSFER);
+  const handleAccountDetailPress = () => navigation.navigate(ROUTES.ACCOUNT_DETAIL);
 
+  // accountId/transactionId는 문자열 그대로 전달한다(Number 변환 금지).
   const handleTxPress = tx => {
     navigation.navigate(ROUTES.TRANSACTION_DETAIL, {
+      accountId: readyAccountId,
       transactionId: tx.id,
-      status: tx.status,
     });
   };
 
@@ -522,23 +599,24 @@ export default function TransactionHistoryScreen({ navigation }) {
     setCustomEndKey(endKey);
   };
 
-  const mappedTxList = transactions.map(tx => ({
-    ...tx,
-    status: mapTransactionStatus(tx.status),
-    time: tx.requestedAt ? formatDateTime(tx.requestedAt) : '-',
-    group: getGroup(tx.requestedAt),
-  }));
+  // 다른 계좌의 목록은 보여주지 않는다. 기간·유형 필터는 불러온 거래에만 적용한다(서버 재조회 없음).
+  const visibleTransactions =
+    readyAccountId !== null && transactionsAccountId === readyAccountId ? transactions : [];
+  const viewModel = useMemo(
+    () => buildHistoryViewModel({ transactions: visibleTransactions, filter, period: dateRange }),
+    [visibleTransactions, filter, dateRange]
+  );
 
-  const filtered = mappedTxList.filter(t => matchesFilter(t, filter));
-  const groups = [...new Set(filtered.map(t => t.group))];
-  const listData = groups.map(g => ({
-    group: g,
-    items: filtered.filter(t => t.group === g),
-  }));
-
-  const isInitialLoading = transactionsLoading && transactions.length === 0;
-  const isFilteredEmpty = !isInitialLoading && filtered.length === 0 && !transactionsError;
+  const hasLoaded = visibleTransactions.length > 0;
+  const firstPageError = Boolean(transactionsError) && lastRequestKind === 'first';
+  const nextPageError = Boolean(transactionsError) && lastRequestKind === 'more' && hasLoaded;
+  const isInitialLoading =
+    readyAccountId !== null &&
+    !hasLoaded &&
+    transactionsAccountId !== readyAccountId &&
+    !transactionsError;
   const isNarrowedByFilter = filter !== '전체' || periodType !== '전체';
+  const showLoadedNotice = hasLoaded && (isNarrowedByFilter || transactionsHasNext);
 
   const renderGroup = ({ item }) => (
     <View style={styles.group}>
@@ -546,14 +624,7 @@ export default function TransactionHistoryScreen({ navigation }) {
       <View style={styles.groupList}>
         {item.items.map((t, i, arr) => (
           <View key={t.id}>
-            <TransactionHistoryRow
-              tx={t}
-              onPress={
-                t.status === 'checking' || t.status === 'pending'
-                  ? undefined
-                  : () => handleTxPress(t)
-              }
-            />
+            <TransactionHistoryRow tx={t} onPress={() => handleTxPress(t)} />
             {i < arr.length - 1 && <View style={styles.divider} />}
           </View>
         ))}
@@ -563,15 +634,28 @@ export default function TransactionHistoryScreen({ navigation }) {
 
   const listHeader = (
     <View>
-      {/* 잔액 요약 */}
-      <TransactionSummary
-        bank={defaultAccount?.bankName ?? '-'}
-        token={defaultAccount?.tokenId ?? '-'}
-        current={summary?.currentBalance ?? 0}
-        available={summary?.availableBalance ?? 0}
-      />
+      <Text style={styles.screenTitle}>거래내역</Text>
+      <Text style={styles.headerSub}>최근 자산 흐름과 처리 상태를 확인해보세요.</Text>
 
-      {/* 필터 */}
+      {readyAccount ? (
+        <TransactionSummary
+          label={readyAccount.label ?? '내 계좌'}
+          statusLabel={getAccountStatusLabel(readyAccount)}
+          statusNotice={getAccountStatusNotice(readyAccount)}
+          balanceText={formatExactMoney(readyAccount.balance, readyAccount.balanceExact)}
+        />
+      ) : null}
+
+      {accountsError && accounts.length > 0 ? (
+        <Text style={styles.noticeText}>계좌 정보를 새로 불러오지 못했어요.</Text>
+      ) : null}
+      {firstPageError && hasLoaded ? (
+        <View>
+          <Text style={styles.noticeText}>거래내역을 새로 불러오지 못했어요.</Text>
+          <InlineButton label="다시 시도" onPress={handleFirstPageRetry} />
+        </View>
+      ) : null}
+
       <View style={styles.filterRow}>
         {FILTERS.map(f => (
           <TransactionFilterTab
@@ -583,7 +667,6 @@ export default function TransactionHistoryScreen({ navigation }) {
         ))}
       </View>
 
-      {/* 기간 선택 */}
       <Pressable
         onPress={() => setPeriodModalVisible(true)}
         style={({ pressed }) => [styles.periodRow, pressed && styles.periodRowPressed]}
@@ -596,27 +679,86 @@ export default function TransactionHistoryScreen({ navigation }) {
           <Feather name="chevron-right" size={16} color={redesign.navInactive} />
         </View>
       </Pressable>
+
+      {showLoadedNotice ? (
+        <Text style={styles.loadedNotice}>불러온 거래 기준으로 표시돼요</Text>
+      ) : null}
     </View>
   );
 
   const listEmpty = isInitialLoading ? (
     <TransactionLoadingSkeleton />
-  ) : transactionsError ? (
-    <TransactionErrorState message={transactionsError} />
-  ) : isFilteredEmpty ? (
-    isNarrowedByFilter ? (
-      <View style={styles.emptyFilter}>
-        <Text style={styles.emptyFilterText}>선택한 조건에 거래내역이 없어요.</Text>
-      </View>
-    ) : (
-      <TransactionEmptyState onTransfer={handleTransferPress} />
-    )
+  ) : firstPageError && !hasLoaded ? (
+    <StatusMessage
+      title="거래내역을 불러오지 못했어요"
+      message={transactionsError}
+      actionLabel="다시 시도"
+      onAction={handleFirstPageRetry}
+    />
+  ) : hasLoaded && viewModel.count === 0 ? (
+    <View style={styles.emptyFilter}>
+      <Text style={styles.emptyFilterText}>
+        {transactionsHasNext
+          ? '불러온 거래 중 선택한 조건에 맞는 거래가 없어요.'
+          : '선택한 조건에 거래내역이 없어요.'}
+      </Text>
+      {transactionsHasNext ? (
+        <InlineButton
+          label="더 불러오기"
+          onPress={requestNextPage}
+          disabled={transactionsLoadingMore}
+        />
+      ) : null}
+    </View>
+  ) : !hasLoaded ? (
+    <TransactionEmptyState onTransfer={handleTransferPress} />
   ) : null;
+
+  // 계좌를 확정할 수 없을 때는 거래 요청 없이 상태만 보여준다.
+  const renderAccountStatus = () => {
+    if (routeAccountMissing) {
+      return (
+        <StatusMessage
+          title="계좌를 찾을 수 없어요"
+          message="조회하려는 계좌가 계좌 목록에 없어요."
+          actionLabel="다시 시도"
+          onAction={handleAccountsRetry}
+          actionDisabled={accountsLoading}
+        />
+      );
+    }
+    if (target.kind === 'error') {
+      return (
+        <StatusMessage
+          title="계좌를 불러오지 못했어요"
+          message={target.message}
+          actionLabel="다시 시도"
+          onAction={handleAccountsRetry}
+          actionDisabled={accountsLoading}
+        />
+      );
+    }
+    if (target.kind === 'empty') {
+      return <StatusMessage title="연결된 계좌가 없어요" />;
+    }
+    if (target.kind === 'noSelection') {
+      return (
+        <StatusMessage
+          title="조회할 계좌를 선택해 주세요"
+          message="계좌 상세에서 조회할 계좌를 고를 수 있어요."
+          actionLabel="계좌 상세로 이동"
+          onAction={handleAccountDetailPress}
+        />
+      );
+    }
+    return <TransactionLoadingSkeleton />; // loading 또는 선택 계좌 맞추는 중
+  };
+
+  const showList = readyAccountId !== null;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <View style={styles.screen}>
-        {/* 헤더 */}
         <View style={styles.header}>
           <Pressable
             onPress={handleBack}
@@ -630,8 +772,9 @@ export default function TransactionHistoryScreen({ navigation }) {
 
           <Pressable
             onPress={handleRefresh}
+            disabled={isRefreshing}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            style={({ pressed }) => pressed && styles.pressedDim}
+            style={({ pressed }) => (pressed || isRefreshing) && styles.pressedDim}
             accessibilityRole="button"
             accessibilityLabel="새로고침"
           >
@@ -639,27 +782,32 @@ export default function TransactionHistoryScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <FlatList
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          data={listData}
-          keyExtractor={item => item.group}
-          renderItem={renderGroup}
-          ListHeaderComponent={
-            <View>
-              <Text style={styles.screenTitle}>거래내역</Text>
-              <Text style={styles.headerSub}>최근 자산 흐름과 처리 상태를 확인해보세요.</Text>
-              {listHeader}
-            </View>
-          }
-          ListEmptyComponent={listEmpty}
-          ListFooterComponent={
-            <TransactionLoadMoreFooter isLoadingMore={transactionsLoadingMore} />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
-        />
+        {showList ? (
+          <FlatList
+            style={styles.scroll}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            data={viewModel.groups}
+            keyExtractor={item => item.group}
+            renderItem={renderGroup}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={listEmpty}
+            ListFooterComponent={
+              <TransactionLoadMoreFooter
+                isLoadingMore={transactionsLoadingMore}
+                errorMessage={nextPageError ? transactionsError : null}
+                onRetry={handleNextPageRetry}
+              />
+            }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+          />
+        ) : (
+          <View style={styles.content}>
+            <Text style={styles.screenTitle}>거래내역</Text>
+            {renderAccountStatus()}
+          </View>
+        )}
       </View>
 
       <TransactionPeriodModal
@@ -704,6 +852,16 @@ const styles = StyleSheet.create({
   headerSub: {
     marginTop: 8,
     fontSize: 13,
+    color: redesign.textSecondary,
+  },
+  noticeText: {
+    marginTop: 16,
+    fontSize: 13,
+    color: redesign.textSecondary,
+  },
+  loadedNotice: {
+    marginTop: 12,
+    fontSize: 12,
     color: redesign.textSecondary,
   },
   scroll: {

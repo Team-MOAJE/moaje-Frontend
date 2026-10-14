@@ -4,20 +4,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { redesign } from '../../theme/redesign';
-import { formatKRW } from '../../utils/formatMoney';
 import TransactionListItem from './TransactionListItem';
 import AccountSelectorBottomSheet from './AccountSelectorBottomSheet';
 
-const hasText = value => typeof value === 'string' && value.trim().length > 0;
+// 서버에 은행명·실제 계좌번호가 없으므로(API-11의 계좌번호 필드는 ACCOUNT-{id} 고정값) 화면에는 계좌 라벨만 표시한다.
+// titleText/balanceText/statusNotice/sync는 부모(AccountDetailScreen)가 assetScreenLogic으로 만든 표시용 값이다.
+const SYNC_TONE_COLOR = {
+  error: colors.red,
+  progress: redesign.textSecondary,
+  notice: redesign.textSecondary,
+};
 
 export default function AccountDetailView({
-  bankName,
-  accountLabel,
-  maskedAccountNumber,
-  currentBalance,
-  isAvailableBalanceSupported,
-  availableBalance,
+  titleText,
+  balanceText,
+  statusNotice,
+  sync,
+  canTransfer,
   isRecentTransactionsSupported,
+  isRecentLoading,
   recentTransactions,
   renderRecentTransaction,
   accounts,
@@ -37,12 +42,6 @@ export default function AccountDetailView({
 }) {
   const [sheetVisible, setSheetVisible] = useState(false);
   const hasAccounts = (accounts?.length ?? 0) > 0;
-  // isAvailableBalanceSupported/availableBalance는 현재 UI에서 렌더하지 않지만,
-  // API가 사용 가능 금액을 지원하게 되면 다시 연결할 수 있도록 prop 구조를 보존한다.
-
-  // 화면 타이틀은 bankName. bankName이 비었을 때만 accountLabel로 대체하고, 둘 다 없으면 '-'.
-  // accountLabel을 별도 줄로 보여주지 않으므로 같은 문구가 반복되지 않는다.
-  const titleText = hasText(bankName) ? bankName : hasText(accountLabel) ? accountLabel : '-';
 
   const renderItem =
     renderRecentTransaction ??
@@ -104,14 +103,22 @@ export default function AccountDetailView({
               accessibilityRole="button"
               accessibilityLabel="계좌 선택"
             >
-              <Text style={styles.accountTitle}>{titleText}</Text>
-              {maskedAccountNumber ? (
-                <View style={styles.maskedRow}>
-                  <Text style={styles.maskedNumber}>{maskedAccountNumber}</Text>
-                  <Feather name="chevron-down" size={16} color={redesign.navInactive} />
-                </View>
-              ) : null}
+              <View style={styles.titleRow}>
+                <Text style={styles.accountTitle}>{titleText}</Text>
+                <Feather name="chevron-down" size={20} color={redesign.navInactive} />
+              </View>
             </Pressable>
+
+            {statusNotice ? <Text style={styles.statusNotice}>{statusNotice}</Text> : null}
+
+            {sync ? (
+              <View style={styles.refreshErrorRow}>
+                <Feather name="info" size={13} color={SYNC_TONE_COLOR[sync.tone]} />
+                <Text style={[styles.refreshErrorText, { color: SYNC_TONE_COLOR[sync.tone] }]}>
+                  {sync.message ? `${sync.label} · ${sync.message}` : sync.label}
+                </Text>
+              </View>
+            ) : null}
 
             {refreshError ? (
               <View style={styles.refreshErrorRow}>
@@ -128,19 +135,22 @@ export default function AccountDetailView({
                 minimumFontScale={0.8}
                 numberOfLines={1}
               >
-                {formatKRW(currentBalance)}
+                {balanceText}
               </Text>
             </View>
 
             <View style={styles.actionRow}>
               <Pressable
                 onPress={onTransferPress}
+                disabled={!canTransfer}
                 style={({ pressed }) => [
                   styles.actionBtn,
                   styles.transferBtn,
-                  pressed && styles.btnPressed,
+                  !canTransfer && styles.btnDisabled,
+                  pressed && canTransfer && styles.btnPressed,
                 ]}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: !canTransfer }}
                 accessibilityLabel="송금하기"
               >
                 <Text style={styles.transferBtnText}>송금하기</Text>
@@ -158,6 +168,9 @@ export default function AccountDetailView({
                 <Text style={styles.historyBtnText}>거래내역</Text>
               </Pressable>
             </View>
+            {!canTransfer && selectedAccountId != null ? (
+              <Text style={styles.transferDisabledNote}>조회만 가능한 계좌예요.</Text>
+            ) : null}
 
             <View style={styles.recentHeader}>
               <Text style={styles.recentTitle}>최근 거래</Text>
@@ -179,6 +192,8 @@ export default function AccountDetailView({
                     <Text style={styles.recentUnsupportedLink}>거래내역 보기</Text>
                   </Pressable>
                 </View>
+              ) : isRecentLoading ? (
+                <Text style={styles.recentEmptyText}>최근 거래를 불러오는 중이에요.</Text>
               ) : (recentTransactions?.length ?? 0) === 0 ? (
                 <Text style={styles.recentEmptyText}>최근 거래 내역이 없어요.</Text>
               ) : (
@@ -289,15 +304,23 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     color: redesign.textPrimary,
   },
-  maskedRow: {
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
-  maskedNumber: {
+  statusNotice: {
+    marginTop: 12,
     fontSize: 13,
     color: redesign.textSecondary,
-    fontFamily: 'monospace',
+  },
+  btnDisabled: {
+    opacity: 0.4,
+  },
+  transferDisabledNote: {
+    marginTop: 8,
+    fontSize: 12,
+    color: redesign.textSecondary,
   },
   refreshErrorRow: {
     flexDirection: 'row',

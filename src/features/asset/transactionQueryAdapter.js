@@ -1,27 +1,37 @@
-// 주의: 이 파일은 백엔드 Gateway 확정 전 "임시 page 기반 pagination 계약"이다.
-// 파라미터 이름(page/size/startDate/endDate)과 hasMore 추정 방식은 이 파일 하나만
-// 고치면 대응 가능하지만, 서버가 cursor 기반으로 바뀌는 등 pagination 전략 자체가
-// 바뀌면 assetSlice.js(transactionsNextPage)와 화면의 loadMore 호출부도 함께
-// 손봐야 할 수 있다 — 이 파일만으로 모든 변경이 흡수된다고 가정하지 않는다.
-export const TRANSACTION_PAGE_SIZE = 50;
+// 거래 목록(API-13) 조회 어댑터. 서버는 50건 고정 커서 방식이며 기간·size·page 파라미터가 없다.
+// - 다음 페이지: 이전 응답의 nextCursor를 lastTransactionId로 보낸다(문자열 그대로, Number 변환 금지).
+// - 기간 필터는 서버 조건이 아니다. 이미 불러온 거래에만 클라이언트에서 적용한다(filterByPeriod).
+import { buildTransactionsQuery } from './assetAccountApi';
 
-export function buildTransactionListParams({ page = 0, dateRange } = {}) {
+// 첫 페이지는 쿼리 없음, 다음 페이지는 { lastTransactionId }. 커서 형식 오류는 요청 전에 거부된다.
+export function buildTransactionsCursorQuery({ cursor } = {}) {
+  return buildTransactionsQuery({ lastTransactionId: cursor ?? undefined });
+}
+
+// mapAccountTransactionsResponse 결과를 슬라이스 입력 형태로 읽는다. hasNext/nextCursor는 서버 값 그대로(추정 없음).
+export function extractTransactionListResult(result) {
   return {
-    page,
-    size: TRANSACTION_PAGE_SIZE,
-    startDate: dateRange?.startKey ?? undefined,
-    endDate: dateRange?.endKey ?? undefined,
+    items: Array.isArray(result?.transactions) ? result.transactions : [],
+    nextCursor: result?.nextCursor ?? null,
+    hasNext: result?.hasNext === true,
   };
 }
 
-export function extractTransactionListResult(envelopeData) {
-  // TEMP: apiClient의 응답 인터셉터가 이미 envelope.data까지 unwrap해서 반환하므로
-  // 여기 인자는 envelope.data 그 자체다. 그 안에서 거래 배열이 어디 있는지
-  // (배열 자체인지 { transactions: [...] }인지)는 develop assetSlice.js가 기존에
-  // 가정하던 shape을 그대로 따른 것이며, 백엔드 확정 전까지는 TEMP 가정이다.
-  const items = Array.isArray(envelopeData) ? envelopeData : (envelopeData?.transactions ?? []);
-  // TEMP: 서버가 hasNext/last 등 실제 필드를 내려주기 전까지, 요청 size만큼 꽉 채워
-  // 돌아왔는지로 다음 페이지 존재 여부를 추정한다. 실제 필드가 확정되면 교체.
-  const hasMore = items.length === TRANSACTION_PAGE_SIZE;
-  return { items, hasMore };
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_PREFIX_PATTERN = /^(\d{4}-\d{2}-\d{2})/;
+
+// createdAt(서버 문자열)의 날짜 부분만 문자열로 비교한다. new Date·시간대 변환을 쓰지 않는다.
+// startKey/endKey는 'YYYY-MM-DD'(경계 포함). 형식이 아닌 경계는 무시한다. 기간이 지정됐는데 날짜를 읽을 수 없는 거래는 제외한다.
+export function filterByPeriod(transactions, { startKey, endKey } = {}) {
+  const list = Array.isArray(transactions) ? transactions : [];
+  const start = DATE_KEY_PATTERN.test(startKey ?? '') ? startKey : null;
+  const end = DATE_KEY_PATTERN.test(endKey ?? '') ? endKey : null;
+  if (!start && !end) return list;
+
+  return list.filter(tx => {
+    const match = DATE_PREFIX_PATTERN.exec(tx?.createdAt ?? '');
+    if (!match) return false;
+    const day = match[1];
+    return (!start || day >= start) && (!end || day <= end);
+  });
 }

@@ -16,9 +16,12 @@ import AccountDetailScreen from '../screens/asset/AccountDetailScreen';
 import DailyLimitScreen from '../screens/asset/DailyLimitScreen';
 import AnalysisScreen from '../screens/asset/AnalysisScreen';
 import TransferScreen from '../screens/asset/TransferScreen';
+import AccountOpenScreen from '../screens/asset/AccountOpenScreen';
 import RecommendationScreen from '../screens/work/RecommendationScreen';
 import ReadinessScreen from '../screens/work/ReadinessScreen';
 import SimulatorScreen from '../screens/work/SimulatorScreen';
+import SpendingScreen from '../screens/work/SpendingScreen';
+import FdsAlertsScreen from '../screens/work/FdsAlertsScreen';
 import MFAScreen from '../screens/auth/MFAScreen';
 import CategoryScreen from '../screens/category/CategoryScreen';
 import MoneyRecapScreen from '../screens/asset/MoneyRecapScreen';
@@ -83,6 +86,11 @@ const renderMainStack = ({
       options={{ headerShown: false }}
     />
     <Stack.Screen
+      name={ROUTES.ACCOUNT_OPEN}
+      component={AccountOpenScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
       name={ROUTES.RECOMMENDATION}
       component={RecommendationScreen}
       options={{ title: '소득 추천' }}
@@ -141,6 +149,16 @@ const renderMainStack = ({
     <Stack.Screen
       name={ROUTES.WORK_SIMULATOR}
       component={SimulatorScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.WORK_SPENDING}
+      component={SpendingScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen
+      name={ROUTES.WORK_FDS}
+      component={FdsAlertsScreen}
       options={{ headerShown: false }}
     />
     {includeWorkRoutes && (

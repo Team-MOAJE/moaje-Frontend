@@ -18,6 +18,11 @@ const FINANCE_ITEMS = [
   { title: '거래내역', desc: '수입과 지출 흐름 확인', routeAction: ROUTES.TRANSACTION_HISTORY },
   { title: '생활비 분석', desc: '지출 패턴과 고정비 분석', routeAction: ROUTES.DAILY_LIMIT },
   { title: '머니 리캡', desc: '월별 소비 요약과 인사이트', routeAction: ROUTES.MONEY_RECAP },
+  {
+    title: '이상거래 알림',
+    desc: '의심 거래 알림과 소비 안전도 확인',
+    routeAction: ROUTES.WORK_FDS,
+  },
 ];
 
 const MY_INFO_ITEMS = [
@@ -40,6 +45,11 @@ const ONBOARDING_ITEMS = [
     title: '미래 자금 시뮬레이션',
     desc: '목표 자금 달성 시점과 지출 조정 비교',
     routeAction: ROUTES.WORK_SIMULATOR,
+  },
+  {
+    title: '학기 소비 분석',
+    desc: '학사 일정, 소비 프로필, 학기 리포트',
+    routeAction: ROUTES.WORK_SPENDING,
   },
 ];
 

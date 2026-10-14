@@ -2,23 +2,32 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { redesign } from '../../theme';
 
-// Home용 머니 리캡 요약. 전체 Money Recap 화면을 복제하지 않고 핵심 값만 props로 받아 보여준다.
-// recap = { periodLabel, summary, rows: [{ key, label, value }] } | null
+// Home 머니 타입 탭의 소비 요약 카드(feat/preview 머니 리캡 카드 디자인). 값은 모두 props로만 받는다.
+// recap = { state: 'loading' | 'error' | 'empty' | 'ready', periodLabel, summary, rows: [{ key, label, value }] } | null
+// 서버(API-16/17)가 주지 않는 학기·시험기간 분석은 다루지 않는다. 카드를 누르면 월별 분석 화면으로 이동한다.
+const STATE_MESSAGES = {
+  loading: '소비 요약을 불러오는 중이에요',
+  error: '소비 요약을 불러오지 못했어요',
+  empty: '이 달에는 집계된 거래가 없어요.',
+};
+
 export default function MoneyRecapPreview({ recap, onPress }) {
+  const message = recap ? STATE_MESSAGES[recap.state] : null;
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="이번 학기 나의 머니 리캡 전체 보기"
+      accessibilityLabel="이번 달 소비 요약 전체 보기"
       style={({ pressed }) => [styles.wrap, pressed && styles.pressed]}
     >
-      <Text style={styles.headerTitle}>이번 학기 나의 머니 리캡</Text>
+      <Text style={styles.headerTitle}>이번 달 소비 요약</Text>
 
       <View style={styles.card}>
-        {recap ? (
+        {recap && recap.state === 'ready' ? (
           <>
-            <Text style={styles.period}>{recap.periodLabel}</Text>
-            <Text style={styles.summary}>{recap.summary}</Text>
+            {recap.periodLabel ? <Text style={styles.period}>{recap.periodLabel}</Text> : null}
+            {recap.summary ? <Text style={styles.summary}>{recap.summary}</Text> : null}
             <View style={styles.rows}>
               {recap.rows.map(row => (
                 <View key={row.key} style={styles.row}>
@@ -29,7 +38,7 @@ export default function MoneyRecapPreview({ recap, onPress }) {
             </View>
           </>
         ) : (
-          <Text style={styles.empty}>머니 리캡을 준비하고 있어요</Text>
+          <Text style={styles.empty}>{message ?? STATE_MESSAGES.loading}</Text>
         )}
       </View>
     </Pressable>

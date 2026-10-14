@@ -14,6 +14,9 @@ const STATUS_CONFIG = {
     icon: 'arrow-down-left',
   },
   expenseCompleted: { label: '지출 완료', bg: '#F3F6EA', fg: colors.textDark, icon: 'file-text' },
+  // FAILED / CANCELED는 서로 다른 상태다. 확인 중으로 합치지 않는다.
+  failed: { label: '실패', bg: 'rgba(229,72,77,0.1)', fg: colors.red, icon: 'alert-circle' },
+  canceled: { label: '취소됨', bg: '#F1F1F1', fg: '#6B6B6B', icon: 'x-circle' },
 };
 
 export default function TransactionStatusBadge({ status }) {

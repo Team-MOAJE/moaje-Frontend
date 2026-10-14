@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -14,12 +15,21 @@ import { Feather } from '@expo/vector-icons';
 import { colors } from '../../theme';
 import { redesign } from '../../theme/redesign';
 import { ROUTES } from '../../constants/routes';
-import { logoutUser } from '../../features/auth/authApi';
+import { logoutUser, updateProfile, changePin, deleteAccount } from '../../features/auth/authApi';
+import {
+  ProfileEditModal,
+  PinChangeModal,
+  DeleteAccountModal,
+} from '../../components/profile/AccountManagementModals';
 
 const MENU_SECTIONS = [
   {
     title: '계정',
-    items: [{ label: '연결된 계좌 관리', route: ROUTES.ACCOUNT_DETAIL }],
+    items: [
+      { label: '내 정보 수정', action: 'editProfile' },
+      { label: 'PIN 변경', action: 'changePin' },
+      { label: '연결된 계좌 관리', route: ROUTES.ACCOUNT_DETAIL },
+    ],
   },
   { title: '앱', items: [{ label: '알림 설정', route: ROUTES.SETTINGS }] },
 ];
@@ -29,7 +39,11 @@ export default function ProfileScreen({ navigation }) {
   const user = useSelector(state => state.auth.user);
   const joined = user?.joinedAt ? `가입 ${user.joinedAt.slice(0, 7).replace('-', '.')}` : null;
   const school = user?.school ?? null;
+  const isAccountActionPending = useSelector(state => state.auth.isAccountActionPending);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  // 'editProfile' | 'changePin' | 'deleteAccount' | null — 열릴 때만 렌더링해 입력값을 초기화한다.
+  const [accountModal, setAccountModal] = useState(null);
+  const [accountModalError, setAccountModalError] = useState(null);
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -39,9 +53,54 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const openAccountModal = kind => {
+    setAccountModalError(null);
+    setAccountModal(kind);
+  };
+
+  const closeAccountModal = () => {
+    if (isAccountActionPending) return;
+    setAccountModal(null);
+    setAccountModalError(null);
+  };
+
   const handleMenuPress = item => {
-    if (item.route) {
+    if (item.action) {
+      openAccountModal(item.action);
+    } else if (item.route) {
       navigation.navigate(item.route);
+    }
+  };
+
+  // thunk 결과 공통 처리: 성공 여부는 서버 응답(fulfilled)으로만 판단한다. condition 거절(중복 요청)은 무시한다.
+  const runAccountAction = async action => {
+    setAccountModalError(null);
+    const result = await dispatch(action);
+    if (result.meta?.condition) return null;
+    if (result.meta?.requestStatus === 'rejected') {
+      setAccountModalError(result.payload?.message ?? '요청을 처리하지 못했어요.');
+      return null;
+    }
+    return result;
+  };
+
+  const handleProfileSubmit = async input => {
+    const result = await runAccountAction(updateProfile(input));
+    if (result) setAccountModal(null);
+  };
+
+  // 탈퇴·PIN 변경 성공 시 authSlice가 로그아웃 상태로 전환해 RootNavigator가 로그인 화면으로 이동한다.
+  const handlePinChangeSubmit = async input => {
+    const result = await runAccountAction(changePin(input));
+    if (result?.payload?.sessionEnded) {
+      Alert.alert('PIN이 변경되었어요', '새 PIN으로 다시 로그인해 주세요.');
+    }
+  };
+
+  const handleDeleteSubmit = async input => {
+    const result = await runAccountAction(deleteAccount(input));
+    if (result?.payload?.sessionEnded) {
+      Alert.alert('회원 탈퇴가 완료되었어요', '그동안 이용해 주셔서 감사합니다.');
     }
   };
 
@@ -80,6 +139,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.accentLine} />
             <Text style={styles.name}>{user?.name ?? '-'}</Text>
             <Text style={styles.userId}>{user?.userId ?? '-'}</Text>
+            {user?.email ? <Text style={styles.userId}>{user.email}</Text> : null}
             {(school || joined) && (
               <Text style={styles.meta}>
                 {school}
@@ -119,7 +179,44 @@ export default function ProfileScreen({ navigation }) {
           >
             <Text style={styles.logoutText}>로그아웃</Text>
           </Pressable>
+
+          {/* 회원 탈퇴 */}
+          <Pressable
+            onPress={() => openAccountModal('deleteAccount')}
+            style={({ pressed }) => [styles.withdrawRow, pressed && styles.menuRowPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="회원 탈퇴"
+          >
+            <Text style={styles.withdrawText}>회원 탈퇴</Text>
+          </Pressable>
         </ScrollView>
+
+        {/* 계정 관리 모달 (API-48 내 정보 수정 / API-51 PIN 변경 / API-49 회원 탈퇴) */}
+        {accountModal === 'editProfile' && (
+          <ProfileEditModal
+            user={user}
+            loading={isAccountActionPending}
+            errorMessage={accountModalError}
+            onSubmit={handleProfileSubmit}
+            onClose={closeAccountModal}
+          />
+        )}
+        {accountModal === 'changePin' && (
+          <PinChangeModal
+            loading={isAccountActionPending}
+            errorMessage={accountModalError}
+            onSubmit={handlePinChangeSubmit}
+            onClose={closeAccountModal}
+          />
+        )}
+        {accountModal === 'deleteAccount' && (
+          <DeleteAccountModal
+            loading={isAccountActionPending}
+            errorMessage={accountModalError}
+            onSubmit={handleDeleteSubmit}
+            onClose={closeAccountModal}
+          />
+        )}
 
         {/* 로그아웃 확인 모달 */}
         <Modal
@@ -259,6 +356,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.red,
+  },
+  withdrawRow: {
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  withdrawText: {
+    fontSize: 13,
+    color: redesign.textSecondary,
   },
   modalOverlay: {
     flex: 1,

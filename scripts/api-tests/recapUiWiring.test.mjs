@@ -201,7 +201,8 @@ test('CategoryScreen: 금융 섹션에 머니 리캡 항목이 있고 기존 항
   assert.match(finance, /ROUTES\.TRANSFER/);
   assert.match(finance, /ROUTES\.TRANSACTION_HISTORY/);
   assert.match(finance, /ROUTES\.DAILY_LIMIT/);
-  assert.equal(count(finance, /routeAction:/g), 4);
+  assert.match(finance, /title: '이상거래 알림'[^}]*routeAction: ROUTES\.WORK_FDS/);
+  assert.equal(count(finance, /routeAction:/g), 5);
   assert.match(category, /FINANCIAL_ONBOARDING_ACTION = 'financialOnboardingEntry'/);
   assert.match(category, /ROUTES\.WORK_READINESS/);
   assert.match(category, /navigation\.navigate\(item\.routeAction\)/);

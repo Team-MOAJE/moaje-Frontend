@@ -1,15 +1,57 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { redesign } from '../../theme';
+import MoneyRecapPreview from './MoneyRecapPreview';
 
-// 기존 재무 온보딩 결과(profile)를 읽기 전용으로 간단히 보여준다.
-// 점수/퍼센트 등 새 값은 만들지 않는다. profile이 없으면 빈 상태만 표시한다.
-export default function HomeMoneyTypeTab({ profile, onDetailPress }) {
+// 머니 타입 탭(feat/preview 디자인). 표시 값은 모두 호출부(HomeScreen)가 정해 props로 넘긴다.
+// - profile: { title, description, tags? } — 서버 Future Profile 제목·설명 또는 기존 로컬 프로필. tags는 있을 때만 그린다.
+// - status: 'ready'(기본) | 'loading' | 'error'. 점수/퍼센트/태그 등 서버에 없는 값은 만들지 않는다.
+// - recap: 이번 달 소비 요약(MoneyRecapPreview). 항상 하단에 그린다.
+export default function HomeMoneyTypeTab({
+  profile,
+  status = 'ready',
+  recap,
+  onRecapPress,
+  onDetailPress,
+  onRetry,
+}) {
+  const recapCard = <MoneyRecapPreview recap={recap} onPress={onRecapPress} />;
+
+  if (status === 'loading') {
+    return (
+      <View>
+        <Text style={styles.title}>머니 타입</Text>
+        <Text style={styles.empty}>머니 타입을 불러오는 중이에요</Text>
+        {recapCard}
+      </View>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <View>
+        <Text style={styles.title}>머니 타입</Text>
+        <Text style={styles.empty}>머니 타입을 불러오지 못했어요</Text>
+        <Pressable
+          onPress={onRetry}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="다시 시도"
+          style={({ pressed }) => [styles.detail, pressed && styles.pressed]}
+        >
+          <Text style={styles.detailText}>다시 시도</Text>
+        </Pressable>
+        {recapCard}
+      </View>
+    );
+  }
+
   if (!profile) {
     return (
       <View>
         <Text style={styles.title}>머니 타입</Text>
         <Text style={styles.empty}>아직 재무 온보딩 결과가 없어요.</Text>
+        {recapCard}
       </View>
     );
   }
@@ -18,7 +60,7 @@ export default function HomeMoneyTypeTab({ profile, onDetailPress }) {
     <View>
       <Text style={styles.label}>나의 머니 타입</Text>
       <Text style={styles.profileTitle}>{profile.title}</Text>
-      <Text style={styles.description}>{profile.description}</Text>
+      {profile.description ? <Text style={styles.description}>{profile.description}</Text> : null}
       {profile.tags?.length > 0 && (
         <View style={styles.tagRow}>
           {profile.tags.map(tag => (
@@ -39,6 +81,8 @@ export default function HomeMoneyTypeTab({ profile, onDetailPress }) {
         <Text style={styles.detailText}>내 Future Profile 자세히 보기</Text>
         <Text style={styles.detailChevron}>›</Text>
       </Pressable>
+
+      {recapCard}
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, isAnyOf } from '@reduxjs/toolkit';
 import {
   loginUser,
   registerUser,
@@ -6,6 +6,9 @@ import {
   restoreSession,
   fetchCurrentUser,
   verifyUnlockPin,
+  updateProfile,
+  deleteAccount,
+  changePin,
 } from './authApi';
 
 // 마지막으로 시작한 인증 요청(login/register/restore/fetchCurrentUser)의 결과만 상태에 반영한다.
@@ -28,6 +31,8 @@ const authSlice = createSlice({
     isAppUnlocked: false,
     // 마지막 인증 요청의 requestId(UI와 무관). logoutUser.pending이 비우면 그 이전 요청의 늦은 결과가 무시된다.
     authRequestId: null,
+    // 내 정보 수정·회원 탈퇴·PIN 변경(API-48·49·51) 진행 중 여부. 동시 요청 방지(thunk condition)와 화면 로딩 표시용.
+    isAccountActionPending: false,
   },
   reducers: {
     logout: state => {
@@ -153,6 +158,43 @@ const authSlice = createSlice({
       .addCase(fetchCurrentUser.rejected, (state, action) => {
         if (!isLatestAuthRequest(state, action)) return;
         state.error = action.payload?.message ?? '사용자 정보 조회에 실패했습니다.';
+      })
+
+      // 내 정보 수정(API-48). 서버가 확인한 사용자 정보로만 갱신한다. onboarding_completed가 null이면 기존 값을 유지한다.
+      .addCase(updateProfile.pending, state => {
+        state.isAccountActionPending = true;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.isAccountActionPending = false;
+        if (!state.user) return;
+        const next = action.payload.user;
+        state.user = {
+          ...state.user,
+          ...next,
+          onboardingCompleted: next.onboardingCompleted ?? state.user.onboardingCompleted ?? null,
+        };
+      })
+      .addCase(updateProfile.rejected, state => {
+        state.isAccountActionPending = false;
+      })
+
+      // 회원 탈퇴(API-49)·PIN 변경(API-51). 서버 성공 후 로컬 세션이 정리된 경우(sessionEnded)에만 로그아웃 상태로 전환한다.
+      // 실패(rejected)는 인증 상태를 건드리지 않는다.
+      .addMatcher(isAnyOf(deleteAccount.pending, changePin.pending), state => {
+        state.isAccountActionPending = true;
+      })
+      .addMatcher(isAnyOf(deleteAccount.fulfilled, changePin.fulfilled), (state, action) => {
+        state.isAccountActionPending = false;
+        if (action.payload?.sessionEnded !== true) return;
+        state.authRequestId = null;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.isAppUnlocked = false;
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addMatcher(isAnyOf(deleteAccount.rejected, changePin.rejected), state => {
+        state.isAccountActionPending = false;
       });
   },
 });

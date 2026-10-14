@@ -11,6 +11,7 @@ export const ROUTES = {
   ACCOUNT_DETAIL: 'AccountDetail',
   DAILY_LIMIT: 'DailyLimit',
   TRANSFER: 'Transfer',
+  ACCOUNT_OPEN: 'AccountOpen',
   RECOMMENDATION: 'Recommendation',
   MFA_SCREEN: 'MFAScreen',
   CATEGORY: 'Category',
@@ -40,6 +41,12 @@ export const ROUTES = {
 
   // 미래 자금 시뮬레이션(API-39~41). 기능 플래그와 무관하게 항상 등록된다.
   WORK_SIMULATOR: 'WorkSimulator',
+
+  // 학기 소비 분석(API-42~46). 기능 플래그와 무관하게 항상 등록된다.
+  WORK_SPENDING: 'WorkSpending',
+
+  // 이상거래 알림(API-25~28). 기능 플래그와 무관하게 항상 등록된다.
+  WORK_FDS: 'WorkFds',
 
   // 공통 상태 화면
   STATUS_SPLASH_LOADING: 'StatusSplashLoading',

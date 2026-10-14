@@ -95,6 +95,8 @@ const LEGACY_SCREEN_SNAPSHOT = [
   'ROUTES.DAILY_LIMIT|DailyLimitScreen|{{ headerShown: false }}',
   'ROUTES.ANALYSIS|AnalysisScreen|{{ headerShown: false }}',
   'ROUTES.TRANSFER|TransferScreen|{{ headerShown: false }}',
+  // API-09 계좌 개설 화면(승인된 최소 네비게이션 추가). 기존 항목의 순서·옵션은 그대로다.
+  'ROUTES.ACCOUNT_OPEN|AccountOpenScreen|{{ headerShown: false }}',
   "ROUTES.RECOMMENDATION|RecommendationScreen|{{ title: '소득 추천' }}",
   "ROUTES.MFA_SCREEN|MFAScreen|{{ title: '추가 인증' }}",
   'ROUTES.CATEGORY|CategoryScreen|{{ headerShown: false }}',
@@ -108,6 +110,10 @@ const LEGACY_SCREEN_SNAPSHOT = [
   'ROUTES.PIN_INPUT|PinInputScreen|{{ headerShown: false }}',
   // 4단계: 사회인 준비도(API-36). 플래그와 무관하게 공통 등록되는 신규 라우트(기존 17개는 위 그대로).
   'ROUTES.WORK_READINESS|ReadinessScreen|{{ headerShown: false }}',
+  // 플래그와 무관하게 상시 등록되는 Work 라우트(시뮬레이터 API-38, 소비 API-42~46).
+  'ROUTES.WORK_SIMULATOR|SimulatorScreen|{{ headerShown: false }}',
+  'ROUTES.WORK_SPENDING|SpendingScreen|{{ headerShown: false }}',
+  'ROUTES.WORK_FDS|FdsAlertsScreen|{{ headerShown: false }}',
 ];
 
 const parseScreens = section => {
@@ -375,14 +381,11 @@ test('Auth/PIN/로그아웃/기존 온보딩 파일은 HEAD 대비 변경 없음
   const files = [
     'src/navigation/RootNavigator.js',
     'src/navigation/AuthNavigator.js',
-    'src/features/auth/authApi.js',
-    'src/features/auth/authSlice.js',
     'src/features/auth/authStorage.js',
     'src/features/auth/guardedLogout.js',
     'src/services/tokenService.js',
     'src/services/apiClient.js',
     'src/screens/auth/PinInputScreen.js',
-    'src/screens/profile/ProfileScreen.js',
     'src/screens/onboarding/FinancialOnboardingScreen.js',
     'src/screens/onboarding/FinancialOnboardingResultScreen.js',
     'src/features/onboarding/useOnboardingFlow.js',
@@ -399,6 +402,46 @@ test('Auth/PIN/로그아웃/기존 온보딩 파일은 HEAD 대비 변경 없음
     return; // git을 쓸 수 없는 환경에서는 건너뜀
   }
   assert.equal(changed, '', `수정되면 안 되는 파일이 변경됨:\n${changed}`);
+});
+
+// API-48·49·51 연동으로 authApi/authSlice/ProfileScreen은 의도적으로 수정된다.
+// HEAD 불변 대신, 기존 로그인·회원가입·로그아웃·잠금 해제·PIN 재설정·로그아웃 UI가 그대로 남아 있는지 확인한다.
+test('API-48·49·51 추가 후에도 기존 Auth/PIN/로그아웃 코드는 보존됨 (authApi/authSlice/ProfileScreen)', () => {
+  const api = readSource('src/features/auth/authApi.js');
+  for (const name of [
+    'loginUser',
+    'registerUser',
+    'logoutUser',
+    'refreshToken',
+    'restoreSession',
+    'fetchCurrentUser',
+    'verifyUnlockPin',
+    'confirmPinReset',
+  ]) {
+    assert.match(api, new RegExp(`export const ${name} = createAsyncThunk`), `${name} 보존`);
+  }
+  assert.match(
+    api,
+    /const PIN_RESET_ENDPOINTS = \{\n  verifyAccount: null,\n  resetConfirm: null,\n\};/
+  );
+  assert.match(
+    api,
+    /export const logoutUser = createAsyncThunk\('auth\/logoutUser', \(\) => runLogout\(sendLogoutRequest\)\);/
+  );
+
+  const slice = readSource('src/features/auth/authSlice.js');
+  for (const name of [
+    'loginUser',
+    'registerUser',
+    'logoutUser',
+    'restoreSession',
+    'verifyUnlockPin',
+  ]) {
+    assert.match(slice, new RegExp(`addCase\\(${name}\\.fulfilled`), `${name}.fulfilled 보존`);
+  }
+
+  const profile = readSource('src/screens/profile/ProfileScreen.js');
+  assert.match(profile, /await dispatch\(logoutUser\(\)\);/);
 });
 
 // ── 5. 서버 미완료 근거 토큰 (렌더 중 전역 변경 금지, 커밋 후 Effect) ──
@@ -792,22 +835,25 @@ test('HomeScreen: 플래그 on에서 로컬 머니 타입을 읽지 않고 중�
     flat,
     /navigation\.navigate\( WORK_ONBOARDING_ENABLED \? ROUTES\.WORK_FINANCIAL_ONBOARDING_RESULT : ROUTES\.FINANCIAL_ONBOARDING_RESULT \)/
   );
-  // 서버 안내 분기에서는 로컬 프로필을 전달하지 않는다
+  // 머니 타입 탭 분기는 resolveHomeMoneyTypeTab이 정한다. 서버 온보딩(flag on)에서는 서버 결과만 쓰고 로컬 프로필을 섞지 않는다
+  // (resolver 동작은 homeMoneyType.test.mjs에서 검증). 서버 결과가 없거나 미완료이면 기존 안내 컴포넌트와 같은 문구·동작을 쓴다.
+  assert.match(
+    flat,
+    /resolveHomeMoneyTypeTab\(\{ flagEnabled: WORK_ONBOARDING_ENABLED, userId: profileUserId, profileState: futureProfileState, localProfile: moneyTypeProfile, \}\)/
+  );
   const guideBlock = sliceBetween(
     source,
-    "if (moneyTypeView.kind === 'server_guide')",
+    'if (moneyTypeTab.kind === HOME_MONEY_TYPE_KIND.GUIDE)',
     'return (\n          <HomeMoneyTypeTab'
   );
   assert.doesNotMatch(guideBlock, /moneyTypeProfile|profile/);
   assert.match(
     squash(guideBlock),
-    /<HomeFutureProfileGuide title=\{moneyTypeView\.title\} message=\{moneyTypeView\.message\} ctaLabel=\{moneyTypeView\.ctaLabel\} onPress=\{handleServerGuidePress\} \/>/
+    /<HomeFutureProfileGuide title=\{moneyTypeTab\.guide\.title\} message=\{moneyTypeTab\.guide\.message\} ctaLabel=\{moneyTypeTab\.guide\.ctaLabel\} onPress=\{handleServerGuidePress\} \/>/
   );
-  // 기존 탭 렌더(legacy)는 그대로
-  assert.match(
-    flat,
-    /<HomeMoneyTypeTab profile=\{moneyTypeProfile\} onDetailPress=\{handleFutureProfilePress\} \/>/
-  );
+  // 그 밖의 분기(legacy 로컬 프로필 포함)는 resolver가 정한 profile만 HomeMoneyTypeTab에 전달한다
+  assert.match(flat, /<HomeMoneyTypeTab profile=\{moneyTypeTab\.profile\}/);
+  assert.match(flat, /onDetailPress=\{handleFutureProfilePress\}/);
   assert.match(
     flat,
     /setMoneyTypeProfile\(buildFinancialOnboardingResultViewModel\(result\.answers\)\.profile\)/

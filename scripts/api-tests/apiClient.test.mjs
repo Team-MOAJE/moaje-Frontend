@@ -460,29 +460,38 @@ test('Idempotency-Key: 뒤늦은 401로 토큰 교체 재시도해도 키 유지
 test('transferFunds: 실패 시 사용한 키를 반환 → 같은 키로 재시도 가능 (모의 서버만 호출)', async () => {
   gateway.validTokens.add('valid');
   await tokenService.setTokens('valid', 'refresh-0');
-  gateway.route('POST', '/api/v1/transfers', () => ({ status: 500, body: { code: 'TEMP' } }));
+  gateway.route('POST', '/api/v1/banking/transfers', () => ({
+    status: 500,
+    body: { code: 'TEMP' },
+  }));
 
   const getState = () => ({ asset: { transferLoading: false } });
   const run = arg => transferFunds(arg)(() => {}, getState, undefined);
+  const input = {
+    withdrawalAccountId: '123',
+    depositBankCode: '001',
+    depositAccountNumber: '110123456789',
+    amount: 1000,
+  };
 
-  const first = await run({ amount: 1000 });
+  const first = await run(input);
   assert.equal(first.type, 'asset/transferFunds/rejected');
   const generatedKey = first.payload.idempotencyKey;
   assert.match(generatedKey, UUID_V4);
 
-  const retry = await run({ amount: 1000, idempotencyKey: generatedKey });
+  const retry = await run({ ...input, idempotencyKey: generatedKey });
   assert.equal(retry.payload.idempotencyKey, generatedKey);
 
-  const custom = await run({ amount: 1000, idempotencyKey: 'demo-transfer-001' });
+  const custom = await run({ ...input, idempotencyKey: 'demo-transfer-001' });
   assert.equal(custom.payload.idempotencyKey, 'demo-transfer-001');
   assert.equal(custom.payload.kind, API_ERROR_KIND.HTTP_5XX);
 
   assert.deepEqual(
-    gateway.requestsTo('/api/v1/transfers').map(r => r.headers['idempotency-key']),
+    gateway.requestsTo('/api/v1/banking/transfers').map(r => r.headers['idempotency-key']),
     [generatedKey, generatedKey, 'demo-transfer-001']
   );
   assert.equal(
-    gateway.requestsTo('/api/v1/transfers').every(r => r.body.idempotencyKey === undefined),
+    gateway.requestsTo('/api/v1/banking/transfers').every(r => r.body.idempotencyKey === undefined),
     true,
     '키는 본문이 아닌 헤더로만 전송'
   );
