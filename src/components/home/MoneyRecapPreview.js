@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 20,
     borderRadius: 14,
-    backgroundColor: redesign.surfaceSoft,
+    backgroundColor: '#F0F1E6',
   },
   period: {
     fontSize: 12,

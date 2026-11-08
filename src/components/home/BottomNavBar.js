@@ -14,11 +14,12 @@ export default function BottomNavBar({
   onTransferPress,
   onCategoryPress,
   activeKey = 'home',
+  backgroundColor,
 }) {
   const handlers = { onHomePress, onTransferPress, onCategoryPress };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, backgroundColor && { backgroundColor }]}>
       {NAV_ITEMS.map(({ key, label, Icon, handler }) => {
         const isActive = key === activeKey;
         const color = isActive ? redesign.accent : redesign.navInactive;

@@ -392,20 +392,24 @@ export default function HomeScreen({ navigation }) {
           onTransferPress={handleBottomTransferPress}
           onCategoryPress={handleBottomCategoryPress}
           activeKey="home"
+          backgroundColor={HOME_BG}
         />
       </View>
     </SafeAreaView>
   );
 }
 
+// 홈 전용 배경. 공용 redesign.bg는 다른 화면이 쓰므로 바꾸지 않는다.
+const HOME_BG = '#F3F4E9';
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: redesign.bg,
+    backgroundColor: HOME_BG,
   },
   screen: {
     flex: 1,
-    backgroundColor: redesign.bg,
+    backgroundColor: HOME_BG,
   },
   scroll: {
     flex: 1,

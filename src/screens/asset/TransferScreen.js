@@ -556,7 +556,10 @@ export default function TransferScreen({ navigation, route }) {
                       pressed && styles.pressed,
                     ]}
                   >
-                    <Text style={styles.quickBtnText}>+{add / 10000}만</Text>
+                      styles.quickAmountBtn,
+                    <Text style={[styles.quickBtnText, styles.quickBtnMaxText]}>
+                      +{add / 10000}만
+                    </Text>
                   </Pressable>
                 ))}
                 <Pressable
@@ -570,6 +573,7 @@ export default function TransferScreen({ navigation, route }) {
                     pressed && styles.pressed,
                   ]}
                 >
+                    styles.quickAmountBtn,
                   <Text
                     style={[
                       styles.quickBtnText,
@@ -635,16 +639,20 @@ export default function TransferScreen({ navigation, route }) {
       </View>
     </SafeAreaView>
   );
+          backgroundColor={TRANSFER_BG}
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: redesign.bg,
+    backgroundColor: TRANSFER_BG,
+// 송금 화면 전용 배경(홈과 동일). 공용 redesign.bg는 바꾸지 않는다.
+const TRANSFER_BG = '#F3F4E9';
+
   },
   screen: {
     flex: 1,
-    backgroundColor: redesign.bg,
+    backgroundColor: TRANSFER_BG,
   },
   keyboardView: {
     flex: 1,
@@ -768,6 +776,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: redesign.textPrimary,
+  quickAmountBtn: {
+    backgroundColor: '#E8EBD8',
+  },
   },
   quickBtnDisabled: {
     opacity: 0.5,
