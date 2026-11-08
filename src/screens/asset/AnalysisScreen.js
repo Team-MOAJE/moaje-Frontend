@@ -185,21 +185,8 @@ export default function AnalysisScreen({ navigation }) {
               <Text style={styles.stateText}>카테고리 내역을 불러오는 중이에요</Text>
             </View>
           )}
-          {categoryView === 'error' && (
-            <View style={styles.stateBox}>
-              <Text style={styles.stateTitle}>카테고리 내역을 불러오지 못했어요</Text>
-              {category.error ? <Text style={styles.stateText}>{category.error}</Text> : null}
-              <Pressable
-                onPress={retryCategory}
-                accessibilityRole="button"
-                accessibilityLabel="다시 시도"
-                style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
-              >
-                <Text style={styles.retryText}>다시 시도</Text>
-              </Pressable>
-            </View>
-          )}
-          {categoryView === 'ready' && categoryRows.length === 0 && (
+          {(categoryView === 'error' ||
+            (categoryView === 'ready' && categoryRows.length === 0)) && (
             <Text style={styles.stateText}>이 달에는 카테고리별 소비가 없어요</Text>
           )}
           {categoryView === 'ready' &&

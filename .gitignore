@@ -60,3 +60,8 @@ design-reference/
 
 #idea
 .idea/
+# Demo seed local state
+scripts/.demo-account.local.json
+scripts/.demo-account-2.local.json
+scripts/.demo-account-3.local.json
+scripts/*.local.json.tmp

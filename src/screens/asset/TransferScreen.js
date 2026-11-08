@@ -305,7 +305,11 @@ export default function TransferScreen({ navigation, route }) {
         // 확정된 송금 이후에만: 이전 잔액·상세·거래를 무효화하고 서버에서 다시 받는다(재조회 실패가 송금 결과를 바꾸지 않는다).
         dispatch(accountDataInvalidated());
         dispatch(fetchAccounts());
-        navigation.goBack();
+        // 화면은 유지하고 다음 송금을 위해 입력만 비운다(출금 계좌 선택은 유지).
+        setAmount(0);
+        setAmountOverflow(null);
+        setDepositBankCode('');
+        setDepositAccountNumber('');
         return;
       }
       if (outcome !== TRANSFER_OUTCOME.IN_PROGRESS) clearPendingTransferKey(); // FAILED/REVERSED: 확정됨
@@ -552,11 +556,11 @@ export default function TransferScreen({ navigation, route }) {
                     disabled={hasPending}
                     style={({ pressed }) => [
                       styles.quickBtn,
+                      styles.quickAmountBtn,
                       hasPending && styles.quickBtnDisabled,
                       pressed && styles.pressed,
                     ]}
                   >
-                      styles.quickAmountBtn,
                     <Text style={[styles.quickBtnText, styles.quickBtnMaxText]}>
                       +{add / 10000}만
                     </Text>
@@ -569,11 +573,11 @@ export default function TransferScreen({ navigation, route }) {
                   accessibilityState={{ disabled: hasPending || maxAmount == null }}
                   style={({ pressed }) => [
                     styles.quickBtn,
+                    styles.quickAmountBtn,
                     (hasPending || maxAmount == null) && styles.quickBtnDisabled,
                     pressed && styles.pressed,
                   ]}
                 >
-                    styles.quickAmountBtn,
                   <Text
                     style={[
                       styles.quickBtnText,
@@ -635,20 +639,20 @@ export default function TransferScreen({ navigation, route }) {
           onTransferPress={handleBottomTransferPress}
           onCategoryPress={handleBottomCategoryPress}
           activeKey="transfer"
+          backgroundColor={TRANSFER_BG}
         />
       </View>
     </SafeAreaView>
   );
-          backgroundColor={TRANSFER_BG}
 }
+
+// 송금 화면 전용 배경(홈과 동일). 공용 redesign.bg는 바꾸지 않는다.
+const TRANSFER_BG = '#F3F4E9';
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: TRANSFER_BG,
-// 송금 화면 전용 배경(홈과 동일). 공용 redesign.bg는 바꾸지 않는다.
-const TRANSFER_BG = '#F3F4E9';
-
   },
   screen: {
     flex: 1,
@@ -772,13 +776,13 @@ const TRANSFER_BG = '#F3F4E9';
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
+  quickAmountBtn: {
+    backgroundColor: '#E8EBD8',
+  },
   quickBtnText: {
     fontSize: 13,
     fontWeight: '600',
     color: redesign.textPrimary,
-  quickAmountBtn: {
-    backgroundColor: '#E8EBD8',
-  },
   },
   quickBtnDisabled: {
     opacity: 0.5,
